@@ -220,6 +220,12 @@
     width: 52px;
   }
 
+  .book-row input.inp-clue.error {
+    border-color: #f44336;
+    background: #1a0505;
+    color: #ff8a80;
+  }
+
   .book-footer {
     display: flex;
     align-items: center;
@@ -564,6 +570,18 @@ const CLUE_RANGES = {
   surreal: [23, 25],
 };
 
+// Retry generatePuzzle until the clue count lands within [min, max].
+// Returns null if it can't hit the range after maxAttempts tries.
+function generatePuzzleInRange(difficulty, maxAttempts = 30) {
+  const [min, max] = CLUE_RANGES[difficulty];
+  for (let i = 0; i < maxAttempts; i++) {
+    const result = generatePuzzle(difficulty);
+    const clues  = result.puzzle.flat().filter(v => v !== 0).length;
+    if (clues >= min && clues <= max) return result;
+  }
+  return null; // range unreachable — caller should report error
+}
+
 function generatePuzzle(difficulty) {
   const solution = newGrid();
   fillGrid(solution);
@@ -797,6 +815,13 @@ function setStatus(msg, cls='') {
 }
 
 function generate(difficulty) {
+  // Validate range first — mark red and abort if broken
+  if (!validateRange(difficulty)) {
+    const [mn, mx] = CLUE_RANGES[difficulty];
+    setStatus(`Invalid clue range for ${difficulty} — min must be ≤ max, between 17 and 80.`, 'fail');
+    return;
+  }
+
   ['easy','medium','hard','extreme','surreal'].forEach(d =>
     document.getElementById('btn-'+d).classList.toggle('active', d === difficulty)
   );
@@ -804,7 +829,13 @@ function generate(difficulty) {
   setStatus('Generating ' + difficulty + ' puzzle…');
   setTimeout(() => {
     try {
-      const { puzzle, solution } = generatePuzzle(difficulty);
+      const result = generatePuzzleInRange(difficulty);
+      if (!result) {
+        const [mn, mx] = CLUE_RANGES[difficulty];
+        setStatus(`Could not reach ${mn}–${mx} clues for ${difficulty} in 30 attempts. Try widening the range.`, 'fail');
+        return;
+      }
+      const { puzzle, solution } = result;
       const check = solve(puzzle);
       if (!check) { setStatus('Generation failed — retry.', 'fail'); return; }
       let match = true;
@@ -930,6 +961,12 @@ async function generateBook() {
   const total = plan.reduce((s, d) => s + d.count, 0);
   if (total === 0) { setStatus('Set at least one puzzle count first.', 'fail'); return; }
 
+  // Validate all active difficulty ranges before starting
+  if (!validateRanges(plan.map(p => p.difficulty))) {
+    setStatus('Fix the highlighted clue ranges before generating.', 'fail');
+    return;
+  }
+
   const JSZip    = await loadJSZip();
   const btnBatch = document.getElementById('btn-batch');
   const btnDl    = document.getElementById('btn-download');
@@ -953,8 +990,10 @@ async function generateBook() {
     for (let i = 1; i <= count; i++) {
       detail.textContent = `${difficulty} ${i}/${count}  —  ${done+1} of ${total} total`;
 
-      const { puzzle, solution } = generatePuzzle(difficulty);
-      if (!solve(puzzle)) { i--; continue; } // retry
+      const result = generatePuzzleInRange(difficulty);
+      if (!result) { i--; continue; } // couldn't hit range — retry puzzle
+      const { puzzle, solution } = result;
+      if (!solve(puzzle)) { i--; continue; } // solver sanity check
 
       const num        = pad(i);
       const puzzleSvg  = await buildStandaloneSVG(puzzle, null,     false);
@@ -1000,21 +1039,40 @@ async function generateBook() {
 }
 
 // ═══════════════════════════════════════════════════════
-// CLUE RANGE UI
+// CLUE RANGE UI + VALIDATION
 // ═══════════════════════════════════════════════════════
+
+// Called live on input — just update CLUE_RANGES and clear any error state.
+// No auto-clamping: let the user type freely; we validate before generating.
 function updateClueRange(difficulty) {
-  let min = parseInt(document.getElementById(`cr-${difficulty}-min`).value, 10);
-  let max = parseInt(document.getElementById(`cr-${difficulty}-max`).value, 10);
-  if (isNaN(min) || isNaN(max)) return;
-  // Keep min ≤ max
-  if (min > max) {
-    const changed = event.target.id.includes('-min') ? 'min' : 'max';
-    if (changed === 'min') max = min;
-    else min = max;
-    document.getElementById(`cr-${difficulty}-min`).value = min;
-    document.getElementById(`cr-${difficulty}-max`).value = max;
-  }
-  CLUE_RANGES[difficulty] = [min, max];
+  const min = parseInt(document.getElementById(`cr-${difficulty}-min`).value, 10);
+  const max = parseInt(document.getElementById(`cr-${difficulty}-max`).value, 10);
+  if (!isNaN(min) && !isNaN(max)) CLUE_RANGES[difficulty] = [min, max];
+  clearRangeError(difficulty);
+}
+
+function clearRangeError(difficulty) {
+  document.getElementById(`cr-${difficulty}-min`).classList.remove('error');
+  document.getElementById(`cr-${difficulty}-max`).classList.remove('error');
+}
+
+// Returns true if valid, false + marks red if not.
+function validateRange(difficulty) {
+  const minEl = document.getElementById(`cr-${difficulty}-min`);
+  const maxEl = document.getElementById(`cr-${difficulty}-max`);
+  const min   = parseInt(minEl.value, 10);
+  const max   = parseInt(maxEl.value, 10);
+  const ok    = !isNaN(min) && !isNaN(max) && min >= 17 && max <= 80 && min <= max;
+  minEl.classList.toggle('error', !ok);
+  maxEl.classList.toggle('error', !ok);
+  return ok;
+}
+
+// Validate only the difficulties that will actually be used.
+function validateRanges(difficulties) {
+  let allOk = true;
+  for (const d of difficulties) if (!validateRange(d)) allOk = false;
+  return allOk;
 }
 
 // ── Init ──
