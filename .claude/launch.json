@@ -4,7 +4,7 @@
     {
       "name": "sudoku",
       "runtimeExecutable": "wsl",
-      "runtimeArgs": ["bash", "/mnt/h/Claude Code/Sudoku/serve.sh"],
+      "runtimeArgs": ["bash", "/mnt/h/GIT/SudokuGenerator/serve.sh"],
       "port": 7890
     }
   ]

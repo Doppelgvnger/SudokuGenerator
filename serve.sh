@@ -1,3 +1,3 @@
 #!/bin/bash
-cd "/mnt/h/Claude Code/Sudoku"
+cd "/mnt/h/GIT/SudokuGenerator"
 python3 -m http.server 7890
