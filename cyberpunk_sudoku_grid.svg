@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 620" width="620" height="620">
+  <rect x="0" y="0" width="620" height="620" fill="#ffffff"/>
+  <line x1="40" y1="100" x2="580" y2="100" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="100" y1="40" x2="100" y2="580" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="40" y1="160" x2="580" y2="160" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="160" y1="40" x2="160" y2="580" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="40" y1="280" x2="580" y2="280" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="280" y1="40" x2="280" y2="580" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="40" y1="340" x2="580" y2="340" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="340" y1="40" x2="340" y2="580" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="40" y1="460" x2="580" y2="460" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="460" y1="40" x2="460" y2="580" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="40" y1="520" x2="580" y2="520" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="520" y1="40" x2="520" y2="580" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="40" y1="40" x2="580" y2="40" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="40" y1="40" x2="40" y2="580" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="40" y1="220" x2="580" y2="220" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="220" y1="40" x2="220" y2="580" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="40" y1="400" x2="580" y2="400" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="400" y1="40" x2="400" y2="580" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="40" y1="580" x2="580" y2="580" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="580" y1="40" x2="580" y2="580" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <polyline points="26,72 26,26 72,26" fill="none" stroke="#0a0a0a" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <polyline points="594,72 594,26 548,26" fill="none" stroke="#0a0a0a" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <polyline points="26,548 26,594 72,594" fill="none" stroke="#0a0a0a" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <polyline points="594,548 594,594 548,594" fill="none" stroke="#0a0a0a" stroke-width="4.5" stroke-linecap="square" stroke-linejoin="miter"/>
+</svg>

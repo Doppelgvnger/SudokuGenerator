@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku Generator</title>
+<style>
+  @font-face {
+    font-family: 'DIN';
+    src: url('Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf') format('truetype');
+  }
+  @font-face {
+    font-family: 'Surreal';
+    src: url('Fonts/surreal-psychedelic-typeface/Surreal.ttf') format('truetype');
+  }
+  @font-face {
+    font-family: 'Vincendo';
+    src: url('Fonts/vincendo/Vincendo-Regular.ttf') format('truetype');
+  }
+
+  :root { --ui-font: 'DIN', sans-serif; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0d0d0d;
+    color: #e0e0e0;
+    font-family: var(--ui-font);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px 20px;
+    gap: 28px;
+  }
+
+  h1 {
+    font-family: var(--ui-font);
+    font-size: 2.4rem;
+    letter-spacing: 0.12em;
+    color: #ffffff;
+    text-align: center;
+  }
+
+  /* ── Top controls row ── */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    align-items: center;
+  }
+
+  button {
+    font-family: var(--ui-font);
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    padding: 11px 26px;
+    border: 2px solid #444;
+    background: #1a1a1a;
+    color: #ccc;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    outline: none;
+  }
+  button:hover { border-color: #aaa; color: #fff; background: #222; }
+  button.active { border-color: #fff; color: #fff; background: #2a2a2a; }
+
+  button#btn-easy.active    { border-color: #4caf50; color: #4caf50; }
+  button#btn-medium.active  { border-color: #ff9800; color: #ff9800; }
+  button#btn-hard.active    { border-color: #f44336; color: #f44336; }
+  button#btn-extreme.active { border-color: #ff5722; color: #ff5722; }
+  button#btn-surreal.active { border-color: #9c27b0; color: #9c27b0; }
+
+  button#btn-download {
+    border-color: #2196f3; color: #2196f3;
+  }
+  button#btn-download:hover { background: #1565c0; color: #fff; border-color: #90caf9; }
+  button#btn-download:disabled { opacity: 0.35; cursor: default; }
+
+  /* ── Font dropdown ── */
+  select#select-font {
+    font-family: var(--ui-font);
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    padding: 11px 16px;
+    border: 2px solid #607d8b;
+    background: #1a1a1a;
+    color: #90a4ae;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2390a4ae' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+  }
+  select#select-font:hover { border-color: #90a4ae; color: #cfd8dc; }
+  select#select-font option { background: #1a1a1a; color: #ccc; }
+
+  /* ── Font manager row ── */
+  .font-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  button.btn-icon {
+    padding: 11px 14px;
+    font-size: 1.1rem;
+    letter-spacing: 0;
+    border-color: #444;
+    color: #888;
+    line-height: 1;
+  }
+  button.btn-icon:hover { border-color: #aaa; color: #fff; }
+  button#btn-remove-font {
+    color: #555;
+    border-color: #333;
+    font-size: 0.9rem;
+    padding: 11px 12px;
+  }
+  button#btn-remove-font:hover { border-color: #f44336; color: #f44336; background: #1a0a0a; }
+  button#btn-remove-font:disabled { opacity: 0.2; cursor: default; }
+
+  button#btn-package {
+    border-color: #26a69a; color: #26a69a;
+  }
+  button#btn-package:hover { background: #00695c; color: #fff; border-color: #80cbc4; }
+
+  /* ── Status ── */
+  #status {
+    font-family: var(--ui-font);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    color: #888;
+    min-height: 1.2em;
+    text-align: center;
+  }
+  #status.ok   { color: #4caf50; }
+  #status.fail { color: #f44336; }
+
+  /* ── Book composition panel ── */
+  #book-panel {
+    width: 100%;
+    max-width: 640px;
+    border: 1px solid #2a2a2a;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .book-panel-title {
+    font-family: var(--ui-font);
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    color: #555;
+    text-transform: uppercase;
+  }
+
+  .book-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .book-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .book-row label {
+    font-family: var(--ui-font);
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    width: 80px;
+    flex-shrink: 0;
+  }
+
+  .book-row label.lbl-easy    { color: #4caf50; }
+  .book-row label.lbl-medium  { color: #ff9800; }
+  .book-row label.lbl-hard    { color: #f44336; }
+  .book-row label.lbl-extreme { color: #ff5722; }
+  .book-row label.lbl-surreal { color: #9c27b0; }
+
+  .book-row input[type=number] {
+    font-family: var(--ui-font);
+    font-size: 1rem;
+    width: 70px;
+    padding: 6px 10px;
+    border: 1px solid #333;
+    background: #111;
+    color: #ddd;
+    outline: none;
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+  .book-row input[type=number]::-webkit-inner-spin-button,
+  .book-row input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .book-row input[type=number]:focus { border-color: #555; }
+
+  .book-row .puzz-count {
+    font-size: 0.8rem;
+    color: #444;
+    letter-spacing: 0.05em;
+  }
+
+  .book-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    border-top: 1px solid #1e1e1e;
+    padding-top: 14px;
+  }
+
+  #book-total-label {
+    font-family: var(--ui-font);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    color: #666;
+  }
+  #book-total-label span { color: #ffd600; }
+
+  button#btn-batch {
+    border-color: #ffd600; color: #ffd600;
+  }
+  button#btn-batch:hover { background: #f9a825; color: #000; border-color: #ffd600; }
+  button#btn-batch:disabled { opacity: 0.35; cursor: default; }
+
+  /* ── Progress bar ── */
+  #batch-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 640px;
+  }
+  #batch-bar-track {
+    width: 100%;
+    height: 5px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    display: none;
+  }
+  #batch-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: #ffd600;
+    transition: width 0.1s linear;
+  }
+  #batch-detail {
+    font-family: var(--ui-font);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    color: #555;
+    min-height: 1em;
+    text-align: center;
+  }
+
+  /* ── Grid previews ── */
+  #grid-container {
+    display: flex;
+    gap: 48px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .grid-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .grid-label {
+    font-family: var(--ui-font);
+    font-size: 0.9rem;
+    letter-spacing: 0.15em;
+    color: #666;
+    text-transform: uppercase;
+  }
+  svg.sudoku-svg {
+    width: 420px;
+    height: 420px;
+    max-width: 90vw;
+    max-height: 90vw;
+  }
+  svg.sudoku-svg text.given {
+    fill: #0a0a0a;
+    font-family: var(--ui-font);
+    font-size: 38px;
+    dominant-baseline: central;
+    text-anchor: middle;
+  }
+  svg.sudoku-svg text.solution {
+    fill: #cc2020;
+    font-family: var(--ui-font);
+    font-size: 38px;
+    dominant-baseline: central;
+    text-anchor: middle;
+  }
+</style>
+</head>
+<body>
+
+<h1>Sudoku Generator</h1>
+
+<!-- ── Difficulty / single-puzzle controls ── -->
+<div class="controls">
+  <button id="btn-easy"    onclick="generate('easy')">Easy</button>
+  <button id="btn-medium"  onclick="generate('medium')">Medium</button>
+  <button id="btn-hard"    onclick="generate('hard')">Hard</button>
+  <button id="btn-extreme" onclick="generate('extreme')">Extreme</button>
+  <button id="btn-surreal" onclick="generate('surreal')">Surreal</button>
+
+  <div class="font-row">
+    <select id="select-font" onchange="changeFont()">
+      <option value="0">Font: DIN</option>
+      <option value="1">Font: Surreal</option>
+      <option value="2">Font: Vincendo</option>
+    </select>
+    <button class="btn-icon" title="Add font from file" onclick="triggerAddFont()">＋</button>
+    <button class="btn-icon" id="btn-remove-font" title="Remove selected custom font" onclick="removeCurrentFont()" disabled>✕</button>
+    <input type="file" id="font-file-input" accept=".ttf,.otf,.woff,.woff2" style="display:none" onchange="addFontFromFile(event)">
+  </div>
+
+  <button id="btn-download" onclick="downloadSingle()" disabled>Download SVGs</button>
+  <button id="btn-package" onclick="packageForSharing()">Package for Sharing</button>
+</div>
+
+<div id="status">Select a difficulty to generate a puzzle.</div>
+
+<!-- ── Book composition panel ── -->
+<div id="book-panel">
+  <div class="book-panel-title">Book Composition</div>
+  <div class="book-rows">
+    <div class="book-row">
+      <label class="lbl-easy">Easy</label>
+      <input type="number" id="inp-easy" value="18" min="0" max="999" oninput="updateTotal()">
+      <span class="puzz-count" id="pc-easy">18 puzzles</span>
+    </div>
+    <div class="book-row">
+      <label class="lbl-medium">Medium</label>
+      <input type="number" id="inp-medium" value="42" min="0" max="999" oninput="updateTotal()">
+      <span class="puzz-count" id="pc-medium">42 puzzles</span>
+    </div>
+    <div class="book-row">
+      <label class="lbl-hard">Hard</label>
+      <input type="number" id="inp-hard" value="34" min="0" max="999" oninput="updateTotal()">
+      <span class="puzz-count" id="pc-hard">34 puzzles</span>
+    </div>
+    <div class="book-row">
+      <label class="lbl-extreme">Extreme</label>
+      <input type="number" id="inp-extreme" value="26" min="0" max="999" oninput="updateTotal()">
+      <span class="puzz-count" id="pc-extreme">26 puzzles</span>
+    </div>
+    <div class="book-row">
+      <label class="lbl-surreal">Surreal</label>
+      <input type="number" id="inp-surreal" value="22" min="0" max="999" oninput="updateTotal()">
+      <span class="puzz-count" id="pc-surreal">22 puzzles</span>
+    </div>
+  </div>
+  <div class="book-footer">
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div id="book-total-label">Total: <span id="book-total">142</span> puzzles · <span id="book-files">568</span> files (SVG + PNG each)</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:0.8rem;letter-spacing:0.08em;color:#555;">PNG resolution</span>
+        <select id="select-scale" style="font-family:var(--ui-font);font-size:0.85rem;padding:5px 10px;border:1px solid #333;background:#111;color:#aaa;outline:none;">
+          <option value="2">2× — 1080px (~72 DPI print)</option>
+          <option value="3" selected>3× — 1620px (~300 DPI print)</option>
+          <option value="4">4× — 2160px (~400 DPI print)</option>
+        </select>
+      </div>
+    </div>
+    <button id="btn-batch" onclick="generateBook()">Generate Full Book</button>
+  </div>
+</div>
+
+<!-- ── Progress ── -->
+<div id="batch-wrap">
+  <div id="batch-bar-track"><div id="batch-bar-fill"></div></div>
+  <div id="batch-detail"></div>
+</div>
+
+<!-- ── Grid previews ── -->
+<div id="grid-container">
+  <div class="grid-wrap">
+    <div class="grid-label">Puzzle</div>
+    <svg id="svg-puzzle" class="sudoku-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540"></svg>
+  </div>
+  <div class="grid-wrap">
+    <div class="grid-label">Solution</div>
+    <svg id="svg-solution" class="sudoku-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540"></svg>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// GRID SVG TEMPLATE
+// ═══════════════════════════════════════════════════════
+// Grid: 9×9 cells of 60px = 540×540. Origin at (0,0). No margins.
+// Thin cell lines: 60,120 | 240,300 | 420,480
+// Thick box lines: 0,180,360,540
+const GRID_SVG = `
+  <rect x="0" y="0" width="540" height="540" fill="#ffffff"/>
+  <line x1="0" y1="60"  x2="540" y2="60"  stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="60"  y1="0" x2="60"  y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="0" y1="120" x2="540" y2="120" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="120" y1="0" x2="120" y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="0" y1="240" x2="540" y2="240" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="240" y1="0" x2="240" y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="0" y1="300" x2="540" y2="300" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="300" y1="0" x2="300" y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="0" y1="420" x2="540" y2="420" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="420" y1="0" x2="420" y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="0" y1="480" x2="540" y2="480" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="480" y1="0" x2="480" y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
+  <line x1="0" y1="0"   x2="540" y2="0"   stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="0" y1="0"   x2="0"   y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="0" y1="180" x2="540" y2="180" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="180" y1="0" x2="180" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="0" y1="360" x2="540" y2="360" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="360" y1="0" x2="360" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="0" y1="540" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="540" y1="0" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+`;
+
+// Cell centre: x = 30 + col*60,  y = 30 + row*60
+function cellX(col) { return 30 + col * 60; }
+function cellY(row) { return 30 + row * 60; }
+
+// ═══════════════════════════════════════════════════════
+// SUDOKU ENGINE
+// ═══════════════════════════════════════════════════════
+function newGrid() { return Array.from({length:9}, () => new Array(9).fill(0)); }
+
+function isValid(grid, row, col, num) {
+  for (let c = 0; c < 9; c++) if (grid[row][c] === num) return false;
+  for (let r = 0; r < 9; r++) if (grid[r][col] === num) return false;
+  const br = Math.floor(row/3)*3, bc = Math.floor(col/3)*3;
+  for (let r = br; r < br+3; r++)
+    for (let c = bc; c < bc+3; c++)
+      if (grid[r][c] === num) return false;
+  return true;
+}
+
+function shuffle(arr) {
+  for (let i = arr.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function fillGrid(grid) {
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (grid[r][c] === 0) {
+        for (const n of shuffle([1,2,3,4,5,6,7,8,9])) {
+          if (isValid(grid, r, c, n)) {
+            grid[r][c] = n;
+            if (fillGrid(grid)) return true;
+            grid[r][c] = 0;
+          }
+        }
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function countSolutions(grid, limit=2) {
+  let count = 0;
+  function bt() {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (grid[r][c] === 0) {
+          for (let n = 1; n <= 9; n++) {
+            if (isValid(grid, r, c, n)) {
+              grid[r][c] = n; bt(); grid[r][c] = 0;
+              if (count >= limit) return;
+            }
+          }
+          return;
+        }
+      }
+    }
+    count++;
+  }
+  bt();
+  return count;
+}
+
+function solve(puzzle) {
+  const grid = puzzle.map(r => [...r]);
+  function bt() {
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (grid[r][c] === 0) {
+          for (let n = 1; n <= 9; n++) {
+            if (isValid(grid, r, c, n)) {
+              grid[r][c] = n;
+              if (bt()) return true;
+              grid[r][c] = 0;
+            }
+          }
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  return bt() ? grid : null;
+}
+
+const CLUE_RANGES = {
+  easy:    [37, 39],
+  medium:  [34, 36],
+  hard:    [29, 32],
+  extreme: [26, 28],
+  surreal: [23, 25],
+};
+
+function generatePuzzle(difficulty) {
+  const solution = newGrid();
+  fillGrid(solution);
+  const [minClues, maxClues] = CLUE_RANGES[difficulty];
+  const targetClues = minClues + Math.floor(Math.random() * (maxClues - minClues + 1));
+  const puzzle = solution.map(r => [...r]);
+  const maxPasses = difficulty === 'surreal' ? 6 : difficulty === 'extreme' ? 3 : 2;
+  for (let pass = 0; pass < maxPasses; pass++) {
+    const filled = [];
+    for (let i = 0; i < 81; i++)
+      if (puzzle[Math.floor(i/9)][i%9] !== 0) filled.push(i);
+    if (filled.length <= targetClues) break;
+    shuffle(filled);
+    for (const pos of filled) {
+      if (puzzle.flat().filter(v => v !== 0).length <= targetClues) break;
+      const r = Math.floor(pos/9), c = pos%9;
+      const backup = puzzle[r][c];
+      puzzle[r][c] = 0;
+      if (countSolutions(puzzle.map(row=>[...row]), 2) !== 1) puzzle[r][c] = backup;
+    }
+  }
+  return { puzzle, solution };
+}
+
+// ═══════════════════════════════════════════════════════
+// FONT SYSTEM
+// ═══════════════════════════════════════════════════════
+const FONTS = [
+  { name: 'DIN',      family: "'DIN', sans-serif",      src: 'Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf' },
+  { name: 'Surreal',  family: "'Surreal', sans-serif",  src: 'Fonts/surreal-psychedelic-typeface/Surreal.ttf' },
+  { name: 'Vincendo', family: "'Vincendo', sans-serif", src: 'Fonts/vincendo/Vincendo-Regular.ttf' },
+];
+let fontIndex = 0;
+// Cache for base64-encoded font data URIs (used in standalone SVG exports)
+const fontB64Cache = {};
+
+async function fetchFontB64(fontObj) {
+  if (fontB64Cache[fontObj.name]) return fontB64Cache[fontObj.name];
+  // Custom or pre-embedded fonts already carry their data URI directly
+  if (fontObj.dataUri) {
+    fontB64Cache[fontObj.name] = fontObj.dataUri;
+    return fontObj.dataUri;
+  }
+  const resp = await fetch(fontObj.src);
+  const buf  = await resp.arrayBuffer();
+  const b64  = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const uri  = `data:font/truetype;base64,${b64}`;
+  fontB64Cache[fontObj.name] = uri;
+  return uri;
+}
+
+// Pre-load built-in fonts in the background on startup
+function prefetchFonts() {
+  FONTS.forEach(f => { if (f.src) fetchFontB64(f).catch(() => {}); });
+}
+
+// ─── Apply font by index ───────────────────────────────
+function applyFont(idx) {
+  fontIndex = idx;
+  const f = FONTS[fontIndex];
+  document.documentElement.style.setProperty('--ui-font', f.family);
+  // Custom fonts are already base64 in the cache via their dataUri
+  if (f.dataUri) fontB64Cache[f.name] = f.dataUri;
+  if (state.puzzle) {
+    renderToSVGElement(document.getElementById('svg-puzzle'),   state.puzzle, state.solution, false);
+    renderToSVGElement(document.getElementById('svg-solution'), state.puzzle, state.solution, true);
+  }
+}
+
+function changeFont() {
+  const idx = parseInt(document.getElementById('select-font').value, 10);
+  applyFont(idx);
+  // Show remove button only for custom fonts (index >= BUILTIN_FONT_COUNT)
+  document.getElementById('btn-remove-font').disabled = idx < BUILTIN_FONT_COUNT;
+}
+
+// ─── Font manager ──────────────────────────────────────
+const BUILTIN_FONT_COUNT = FONTS.length; // set once, never changes
+const CUSTOM_FONTS_KEY   = 'sudoku_custom_fonts';
+
+function rebuildFontDropdown() {
+  const sel = document.getElementById('select-font');
+  sel.innerHTML = '';
+  FONTS.forEach((f, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = (i >= BUILTIN_FONT_COUNT ? '★ ' : '') + 'Font: ' + f.name;
+    sel.appendChild(opt);
+  });
+  sel.value = fontIndex;
+}
+
+function registerFontFace(name, dataUri) {
+  // Inject @font-face into the page so the font renders in SVG previews
+  const style = document.createElement('style');
+  style.textContent = `@font-face { font-family: '${name}'; src: url('${dataUri}') format('truetype'); }`;
+  document.head.appendChild(style);
+}
+
+function saveCustomFonts() {
+  const custom = FONTS.slice(BUILTIN_FONT_COUNT).map(f => ({
+    name: f.name, family: f.family, dataUri: f.dataUri,
+  }));
+  localStorage.setItem(CUSTOM_FONTS_KEY, JSON.stringify(custom));
+}
+
+function loadCustomFonts() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(CUSTOM_FONTS_KEY) || '[]');
+    saved.forEach(f => {
+      FONTS.push({ name: f.name, family: `'${f.name}', sans-serif`, dataUri: f.dataUri });
+      fontB64Cache[f.name] = f.dataUri;
+      registerFontFace(f.name, f.dataUri);
+    });
+    if (saved.length) rebuildFontDropdown();
+  } catch(e) {}
+}
+
+function triggerAddFont() {
+  document.getElementById('font-file-input').value = '';
+  document.getElementById('font-file-input').click();
+}
+
+function addFontFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Derive a default name from the filename (strip extension)
+  const defaultName = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  const name = (prompt('Font display name:', defaultName) || '').trim();
+  if (!name) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUri = e.target.result; // already a data URI from readAsDataURL
+    // Register in page
+    registerFontFace(name, dataUri);
+    // Add to FONTS array and cache
+    FONTS.push({ name, family: `'${name}', sans-serif`, dataUri });
+    fontB64Cache[name] = dataUri;
+    // Save to localStorage
+    saveCustomFonts();
+    // Update dropdown and select the new font
+    rebuildFontDropdown();
+    const newIdx = FONTS.length - 1;
+    document.getElementById('select-font').value = newIdx;
+    applyFont(newIdx);
+    document.getElementById('btn-remove-font').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeCurrentFont() {
+  if (fontIndex < BUILTIN_FONT_COUNT) return;
+  const name = FONTS[fontIndex].name;
+  if (!confirm(`Remove font "${name}"?`)) return;
+  FONTS.splice(fontIndex, 1);
+  delete fontB64Cache[name];
+  saveCustomFonts();
+  const newIdx = Math.min(fontIndex, FONTS.length - 1);
+  rebuildFontDropdown();
+  document.getElementById('select-font').value = newIdx;
+  applyFont(newIdx);
+  document.getElementById('btn-remove-font').disabled = newIdx < BUILTIN_FONT_COUNT;
+}
+
+// ═══════════════════════════════════════════════════════
+// SVG RENDERING
+// ═══════════════════════════════════════════════════════
+function buildSVGContent(puzzle, solution, showSolution) {
+  let texts = '';
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const v = puzzle[r][c];
+      const x = cellX(c), y = cellY(r);
+      if (v !== 0) {
+        texts += `<text class="given" x="${x}" y="${y}">${v}</text>\n`;
+      } else if (showSolution && solution) {
+        texts += `<text class="solution" x="${x}" y="${y}">${solution[r][c]}</text>\n`;
+      }
+    }
+  }
+  return texts;
+}
+
+async function buildStandaloneSVG(puzzle, solution, showSolution) {
+  const f      = FONTS[fontIndex];
+  const srcUri = await fetchFontB64(f);   // embedded — no external dependency
+  const styleBlock = `<defs><style>
+    @font-face {
+      font-family: '${f.name}';
+      src: url('${srcUri}') format('truetype');
+    }
+    text.given {
+      fill: #0a0a0a;
+      font-family: ${f.family};
+      font-size: 38px;
+      dominant-baseline: central;
+      text-anchor: middle;
+    }
+    text.solution {
+      fill: #cc2020;
+      font-family: ${f.family};
+      font-size: 38px;
+      dominant-baseline: central;
+      text-anchor: middle;
+    }
+  </style></defs>`;
+  const texts = buildSVGContent(puzzle, solution, showSolution);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540">
+${styleBlock}
+${GRID_SVG}
+${texts}
+</svg>`;
+}
+
+function renderToSVGElement(svgEl, puzzle, solution, showSolution) {
+  svgEl.innerHTML = GRID_SVG + buildSVGContent(puzzle, solution, showSolution);
+}
+
+// ═══════════════════════════════════════════════════════
+// STATE + SINGLE-PUZZLE CONTROLS
+// ═══════════════════════════════════════════════════════
+let state = { puzzle: null, solution: null, difficulty: null };
+
+function setStatus(msg, cls='') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = cls;
+}
+
+function generate(difficulty) {
+  ['easy','medium','hard','extreme','surreal'].forEach(d =>
+    document.getElementById('btn-'+d).classList.toggle('active', d === difficulty)
+  );
+  document.getElementById('btn-download').disabled = true;
+  setStatus('Generating ' + difficulty + ' puzzle…');
+  setTimeout(() => {
+    try {
+      const { puzzle, solution } = generatePuzzle(difficulty);
+      const check = solve(puzzle);
+      if (!check) { setStatus('Generation failed — retry.', 'fail'); return; }
+      let match = true;
+      outer: for (let r = 0; r < 9; r++)
+        for (let c = 0; c < 9; c++)
+          if (check[r][c] !== solution[r][c]) { match = false; break outer; }
+      if (!match) { generate(difficulty); return; }
+      state = { puzzle, solution, difficulty };
+      const clues = puzzle.flat().filter(v => v !== 0).length;
+      setStatus(`${difficulty.charAt(0).toUpperCase()+difficulty.slice(1)} — ${clues} clues — Solver verified ✓`, 'ok');
+      renderToSVGElement(document.getElementById('svg-puzzle'),   puzzle, solution, false);
+      renderToSVGElement(document.getElementById('svg-solution'), puzzle, solution, true);
+      document.getElementById('btn-download').disabled = false;
+    } catch(e) { setStatus('Error: ' + e.message, 'fail'); }
+  }, 10);
+}
+
+// ═══════════════════════════════════════════════════════
+// BOOK COMPOSITION UI
+// ═══════════════════════════════════════════════════════
+function updateTotal() {
+  const diffs = ['easy','medium','hard','extreme','surreal'];
+  let total = 0;
+  for (const d of diffs) {
+    const v = parseInt(document.getElementById('inp-'+d).value, 10) || 0;
+    total += v;
+    document.getElementById('pc-'+d).textContent = v + ' puzzle' + (v === 1 ? '' : 's');
+  }
+  document.getElementById('book-total').textContent = total;
+  document.getElementById('book-files').textContent  = total * 4; // SVG+PNG per puzzle+solution
+}
+
+function getBookPlan() {
+  return ['easy','medium','hard','extreme','surreal'].map(d => ({
+    difficulty: d,
+    count: Math.max(0, parseInt(document.getElementById('inp-'+d).value, 10) || 0),
+  })).filter(d => d.count > 0);
+}
+
+// ═══════════════════════════════════════════════════════
+// SVG → PNG via canvas
+// ═══════════════════════════════════════════════════════
+function svgToPng(svgString, scale) {
+  return new Promise((resolve, reject) => {
+    const size = 540 * scale;
+    const canvas = document.createElement('canvas');
+    canvas.width  = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const blob = new Blob([svgString], { type: 'image/svg+xml' });
+    const url  = URL.createObjectURL(blob);
+    const img  = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(pngBlob => {
+        canvas.remove();
+        resolve(pngBlob);
+      }, 'image/png');
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function getPngScale() {
+  return parseInt(document.getElementById('select-scale').value, 10);
+}
+
+// ═══════════════════════════════════════════════════════
+// JSZip loader
+// ═══════════════════════════════════════════════════════
+function loadJSZip() {
+  return new Promise((resolve, reject) => {
+    if (window.JSZip) { resolve(window.JSZip); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = () => resolve(window.JSZip);
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// SINGLE-PUZZLE DOWNLOAD
+// ═══════════════════════════════════════════════════════
+async function downloadSingle() {
+  if (!state.puzzle) return;
+  setStatus('Preparing download…');
+  const JSZip = await loadJSZip();
+  const scale = getPngScale();
+  const zip   = new JSZip();
+
+  const puzzleSvg   = await buildStandaloneSVG(state.puzzle, null,           false);
+  const solutionSvg = await buildStandaloneSVG(state.puzzle, state.solution, true);
+
+  zip.file('sudoku_puzzle.svg',    puzzleSvg);
+  zip.file('sudoku_solution.svg',  solutionSvg);
+
+  setStatus('Rendering PNGs…');
+  zip.file('sudoku_puzzle.png',    await svgToPng(puzzleSvg,   scale));
+  zip.file('sudoku_solution.png',  await svgToPng(solutionSvg, scale));
+
+  const blob = await zip.generateAsync({ type:'blob' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: `sudoku_${state.difficulty}.zip`,
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+  const clues = state.puzzle.flat().filter(v => v!==0).length;
+  setStatus(`Downloaded — ${state.difficulty} — ${clues} clues ✓`, 'ok');
+}
+
+// ═══════════════════════════════════════════════════════
+// FULL BOOK BATCH GENERATOR
+// ═══════════════════════════════════════════════════════
+function pad(n, len=2) { return String(n).padStart(len,'0'); }
+function yieldToBrowser() { return new Promise(r => setTimeout(r, 0)); }
+
+async function generateBook() {
+  const plan  = getBookPlan();
+  const total = plan.reduce((s, d) => s + d.count, 0);
+  if (total === 0) { setStatus('Set at least one puzzle count first.', 'fail'); return; }
+
+  const JSZip    = await loadJSZip();
+  const btnBatch = document.getElementById('btn-batch');
+  const btnDl    = document.getElementById('btn-download');
+  const track    = document.getElementById('batch-bar-track');
+  const fill     = document.getElementById('batch-bar-fill');
+  const detail   = document.getElementById('batch-detail');
+
+  btnBatch.disabled = true;
+  btnDl.disabled    = true;
+  track.style.display = 'block';
+  fill.style.width    = '0%';
+
+  const zip   = new JSZip();
+  const scale = getPngScale();
+  let   done  = 0;
+
+  for (const { difficulty, count } of plan) {
+    const folder    = zip.folder(difficulty);
+    const folderSol = zip.folder(difficulty + '/solutions');
+
+    for (let i = 1; i <= count; i++) {
+      detail.textContent = `${difficulty} ${i}/${count}  —  ${done+1} of ${total} total`;
+
+      const { puzzle, solution } = generatePuzzle(difficulty);
+      if (!solve(puzzle)) { i--; continue; } // retry
+
+      const num        = pad(i);
+      const puzzleSvg  = await buildStandaloneSVG(puzzle, null,     false);
+      const solutionSvg = await buildStandaloneSVG(puzzle, solution, true);
+
+      folder.file(   `puzzle_${num}.svg`,    puzzleSvg);
+      folderSol.file(`solution_${num}.svg`,  solutionSvg);
+      folder.file(   `puzzle_${num}.png`,    await svgToPng(puzzleSvg,   scale));
+      folderSol.file(`solution_${num}.png`,  await svgToPng(solutionSvg, scale));
+
+      done++;
+      fill.style.width = ((done / total) * 100).toFixed(1) + '%';
+
+      renderToSVGElement(document.getElementById('svg-puzzle'),   puzzle, solution, false);
+      renderToSVGElement(document.getElementById('svg-solution'), puzzle, solution, true);
+      setStatus(`Generating… ${difficulty} ${i}/${count} — ${puzzle.flat().filter(v=>v!==0).length} clues`);
+
+      await yieldToBrowser();
+    }
+  }
+
+  detail.textContent = `Zipping ${total*4} files…`;
+  setStatus('Zipping…');
+  await yieldToBrowser();
+
+  const blob = await zip.generateAsync(
+    { type:'blob', compression:'DEFLATE', compressionOptions:{ level:6 } },
+    meta => { fill.style.width = meta.percent.toFixed(1) + '%'; }
+  );
+
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: 'sudoku_book.zip',
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  fill.style.width = '100%';
+  detail.textContent = `✓ ${total} puzzles · ${total*4} files (SVG + PNG) downloaded`;
+  setStatus(`Full book generated — ${total} puzzles, solver verified ✓`, 'ok');
+  btnBatch.disabled = false;
+  btnDl.disabled = state.puzzle ? false : true;
+}
+
+// ═══════════════════════════════════════════════════════
+// PACKAGE FOR SHARING — single self-contained HTML
+// ═══════════════════════════════════════════════════════
+async function packageForSharing() {
+  const btn = document.getElementById('btn-package');
+  btn.disabled = true;
+  btn.textContent = 'Packaging…';
+  setStatus('Building self-contained HTML…');
+
+  // 1. Fetch JSZip source to embed it
+  let jszipSrc = '';
+  try {
+    const r = await fetch('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    jszipSrc = await r.text();
+  } catch(e) {
+    setStatus('Could not fetch JSZip — check your internet connection.', 'fail');
+    btn.disabled = false; btn.textContent = 'Package for Sharing';
+    return;
+  }
+
+  // 2. Encode all built-in fonts to base64
+  const fontEmbeds = [];
+  for (const f of FONTS.slice(0, BUILTIN_FONT_COUNT)) {
+    const uri = await fetchFontB64(f);
+    fontEmbeds.push({ name: f.name, family: f.family, dataUri: uri });
+  }
+
+  // 3. Include any custom fonts the user has already added
+  for (const f of FONTS.slice(BUILTIN_FONT_COUNT)) {
+    fontEmbeds.push({ name: f.name, family: f.family, dataUri: f.dataUri });
+  }
+
+  // 4. Read the current HTML and patch it for standalone use
+  let html = document.documentElement.outerHTML;
+
+  // 4a. Replace @font-face src URLs in CSS with embedded data URIs
+  const cssReplacements = {
+    'DIN1451-36breit.ttf': fontEmbeds.find(f => f.name === 'DIN')?.dataUri,
+    'Surreal.ttf':          fontEmbeds.find(f => f.name === 'Surreal')?.dataUri,
+    'Vincendo-Regular.ttf': fontEmbeds.find(f => f.name === 'Vincendo')?.dataUri,
+  };
+  Object.entries(cssReplacements).forEach(([filename, uri]) => {
+    if (!uri) return;
+    html = html.replace(
+      new RegExp(`url\\('Fonts/[^']*${filename}'\\)`, 'g'),
+      `url('${uri}')`
+    );
+  });
+
+  // 4b. Patch the FONTS array in JS so each built-in entry carries its dataUri
+  //     This means fetchFontB64() never needs to fetch() — works fully offline
+  fontEmbeds.slice(0, BUILTIN_FONT_COUNT).forEach(f => {
+    // Match the FONTS entry: { name: 'DIN', family: ..., src: '...' }
+    html = html.replace(
+      new RegExp(`(\\{\\s*name:\\s*'${f.name}',[^}]*?)src:\\s*'[^']*'`),
+      `$1dataUri: '${f.dataUri}'`
+    );
+  });
+
+  // 4c. Embed JSZip inline instead of CDN load
+  html = html.replace(
+    /const s = document\.createElement\('script'\);\s*s\.src = 'https:\/\/cdnjs[^']*';\s*s\.onload = \(\) => resolve\(window\.JSZip\);\s*s\.onerror = reject;\s*document\.head\.appendChild\(s\);/,
+    `// JSZip embedded\n    (function(){${jszipSrc}})();\n    resolve(window.JSZip);`
+  );
+
+  // 4d. Bake in any custom fonts the user already added
+  const customFontScript = fontEmbeds.slice(BUILTIN_FONT_COUNT).map(f => `
+    FONTS.push({ name: '${f.name}', family: \`'${f.name}', sans-serif\`, dataUri: \`${f.dataUri}\` });
+    fontB64Cache['${f.name}'] = \`${f.dataUri}\`;
+    registerFontFace('${f.name}', \`${f.dataUri}\`);`
+  ).join('\n');
+
+  const initMarker = '// ── Init ──';
+  const initReplacement = customFontScript
+    ? `// ── Embedded custom fonts ──\n${customFontScript}\n\n${initMarker}`
+    : initMarker;
+  html = html.replace(initMarker, initReplacement);
+
+  if (customFontScript) {
+    html = html.replace(
+      'loadCustomFonts();\nprefetchFonts();\nupdateTotal();',
+      'loadCustomFonts();\nrebuildFontDropdown();\nprefetchFonts();\nupdateTotal();'
+    );
+  }
+
+  // 5. Download as standalone HTML
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: 'sudoku-generator.html',
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  setStatus(`Packaged! sudoku-generator.html is ready to share ✓`, 'ok');
+  btn.disabled = false;
+  btn.textContent = 'Package for Sharing';
+}
+
+// ── Init ──
+loadCustomFonts();
+prefetchFonts();
+updateTotal();
+</script>
+</body>
+</html>

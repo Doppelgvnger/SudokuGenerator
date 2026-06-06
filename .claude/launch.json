@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sudoku",
+      "runtimeExecutable": "wsl",
+      "runtimeArgs": ["bash", "/mnt/h/Claude Code/Sudoku/serve.sh"],
+      "port": 7890
+    }
+  ]
+}

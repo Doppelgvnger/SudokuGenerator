@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "PowerShell(\\(Get-Command npx -ErrorAction SilentlyContinue\\).Source; \\(Get-Command python -ErrorAction SilentlyContinue\\).Source; \\(Get-Command python3 -ErrorAction SilentlyContinue\\).Source)",
+      "PowerShell(Get-Command node,node.exe,py,py.exe,ruby,php -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\nodejs\",\"C:\\\\Program Files \\(x86\\)\\\\nodejs\",\"$env:APPDATA\\\\npm\",\"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\" -ErrorAction SilentlyContinue | Select-Object FullName)",
+      "Bash(wsl which *)",
+      "Bash(wsl node *)",
+      "Bash(wsl python3 *)"
+    ]
+  }
+}
