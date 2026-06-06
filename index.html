@@ -124,11 +124,6 @@
   button#btn-remove-font:hover { border-color: #f44336; color: #f44336; background: #1a0a0a; }
   button#btn-remove-font:disabled { opacity: 0.2; cursor: default; }
 
-  button#btn-package {
-    border-color: #26a69a; color: #26a69a;
-  }
-  button#btn-package:hover { background: #00695c; color: #fff; border-color: #80cbc4; }
-
   /* ── Status ── */
   #status {
     font-family: var(--ui-font);
@@ -206,6 +201,23 @@
     font-size: 0.8rem;
     color: #444;
     letter-spacing: 0.05em;
+  }
+
+  .book-row .range-sep {
+    font-size: 0.8rem;
+    color: #333;
+    padding: 0 2px;
+  }
+
+  .book-row .range-label {
+    font-size: 0.78rem;
+    color: #3a3a3a;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  .book-row input.inp-clue {
+    width: 52px;
   }
 
   .book-footer {
@@ -330,7 +342,6 @@
   </div>
 
   <button id="btn-download" onclick="downloadSingle()" disabled>Download SVGs</button>
-  <button id="btn-package" onclick="packageForSharing()">Package for Sharing</button>
 </div>
 
 <div id="status">Select a difficulty to generate a puzzle.</div>
@@ -339,31 +350,57 @@
 <div id="book-panel">
   <div class="book-panel-title">Book Composition</div>
   <div class="book-rows">
+
     <div class="book-row">
       <label class="lbl-easy">Easy</label>
       <input type="number" id="inp-easy" value="18" min="0" max="999" oninput="updateTotal()">
       <span class="puzz-count" id="pc-easy">18 puzzles</span>
+      <span class="range-label">clues:</span>
+      <input type="number" class="inp-clue" id="cr-easy-min" value="37" min="17" max="80" oninput="updateClueRange('easy')">
+      <span class="range-sep">–</span>
+      <input type="number" class="inp-clue" id="cr-easy-max" value="39" min="17" max="80" oninput="updateClueRange('easy')">
     </div>
+
     <div class="book-row">
       <label class="lbl-medium">Medium</label>
       <input type="number" id="inp-medium" value="42" min="0" max="999" oninput="updateTotal()">
       <span class="puzz-count" id="pc-medium">42 puzzles</span>
+      <span class="range-label">clues:</span>
+      <input type="number" class="inp-clue" id="cr-medium-min" value="34" min="17" max="80" oninput="updateClueRange('medium')">
+      <span class="range-sep">–</span>
+      <input type="number" class="inp-clue" id="cr-medium-max" value="36" min="17" max="80" oninput="updateClueRange('medium')">
     </div>
+
     <div class="book-row">
       <label class="lbl-hard">Hard</label>
       <input type="number" id="inp-hard" value="34" min="0" max="999" oninput="updateTotal()">
       <span class="puzz-count" id="pc-hard">34 puzzles</span>
+      <span class="range-label">clues:</span>
+      <input type="number" class="inp-clue" id="cr-hard-min" value="29" min="17" max="80" oninput="updateClueRange('hard')">
+      <span class="range-sep">–</span>
+      <input type="number" class="inp-clue" id="cr-hard-max" value="32" min="17" max="80" oninput="updateClueRange('hard')">
     </div>
+
     <div class="book-row">
       <label class="lbl-extreme">Extreme</label>
       <input type="number" id="inp-extreme" value="26" min="0" max="999" oninput="updateTotal()">
       <span class="puzz-count" id="pc-extreme">26 puzzles</span>
+      <span class="range-label">clues:</span>
+      <input type="number" class="inp-clue" id="cr-extreme-min" value="26" min="17" max="80" oninput="updateClueRange('extreme')">
+      <span class="range-sep">–</span>
+      <input type="number" class="inp-clue" id="cr-extreme-max" value="28" min="17" max="80" oninput="updateClueRange('extreme')">
     </div>
+
     <div class="book-row">
       <label class="lbl-surreal">Surreal</label>
       <input type="number" id="inp-surreal" value="22" min="0" max="999" oninput="updateTotal()">
       <span class="puzz-count" id="pc-surreal">22 puzzles</span>
+      <span class="range-label">clues:</span>
+      <input type="number" class="inp-clue" id="cr-surreal-min" value="23" min="17" max="80" oninput="updateClueRange('surreal')">
+      <span class="range-sep">–</span>
+      <input type="number" class="inp-clue" id="cr-surreal-max" value="25" min="17" max="80" oninput="updateClueRange('surreal')">
     </div>
+
   </div>
   <div class="book-footer">
     <div style="display:flex;flex-direction:column;gap:8px;">
@@ -963,102 +1000,21 @@ async function generateBook() {
 }
 
 // ═══════════════════════════════════════════════════════
-// PACKAGE FOR SHARING — single self-contained HTML
+// CLUE RANGE UI
 // ═══════════════════════════════════════════════════════
-async function packageForSharing() {
-  const btn = document.getElementById('btn-package');
-  btn.disabled = true;
-  btn.textContent = 'Packaging…';
-  setStatus('Building self-contained HTML…');
-
-  // 1. Fetch JSZip source to embed it
-  let jszipSrc = '';
-  try {
-    const r = await fetch('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
-    jszipSrc = await r.text();
-  } catch(e) {
-    setStatus('Could not fetch JSZip — check your internet connection.', 'fail');
-    btn.disabled = false; btn.textContent = 'Package for Sharing';
-    return;
+function updateClueRange(difficulty) {
+  let min = parseInt(document.getElementById(`cr-${difficulty}-min`).value, 10);
+  let max = parseInt(document.getElementById(`cr-${difficulty}-max`).value, 10);
+  if (isNaN(min) || isNaN(max)) return;
+  // Keep min ≤ max
+  if (min > max) {
+    const changed = event.target.id.includes('-min') ? 'min' : 'max';
+    if (changed === 'min') max = min;
+    else min = max;
+    document.getElementById(`cr-${difficulty}-min`).value = min;
+    document.getElementById(`cr-${difficulty}-max`).value = max;
   }
-
-  // 2. Encode all built-in fonts to base64
-  const fontEmbeds = [];
-  for (const f of FONTS.slice(0, BUILTIN_FONT_COUNT)) {
-    const uri = await fetchFontB64(f);
-    fontEmbeds.push({ name: f.name, family: f.family, dataUri: uri });
-  }
-
-  // 3. Include any custom fonts the user has already added
-  for (const f of FONTS.slice(BUILTIN_FONT_COUNT)) {
-    fontEmbeds.push({ name: f.name, family: f.family, dataUri: f.dataUri });
-  }
-
-  // 4. Read the current HTML and patch it for standalone use
-  let html = document.documentElement.outerHTML;
-
-  // 4a. Replace @font-face src URLs in CSS with embedded data URIs
-  const cssReplacements = {
-    'DIN1451-36breit.ttf': fontEmbeds.find(f => f.name === 'DIN')?.dataUri,
-    'Surreal.ttf':          fontEmbeds.find(f => f.name === 'Surreal')?.dataUri,
-    'Vincendo-Regular.ttf': fontEmbeds.find(f => f.name === 'Vincendo')?.dataUri,
-  };
-  Object.entries(cssReplacements).forEach(([filename, uri]) => {
-    if (!uri) return;
-    html = html.replace(
-      new RegExp(`url\\('Fonts/[^']*${filename}'\\)`, 'g'),
-      `url('${uri}')`
-    );
-  });
-
-  // 4b. Patch the FONTS array in JS so each built-in entry carries its dataUri
-  //     This means fetchFontB64() never needs to fetch() — works fully offline
-  fontEmbeds.slice(0, BUILTIN_FONT_COUNT).forEach(f => {
-    // Match the FONTS entry: { name: 'DIN', family: ..., src: '...' }
-    html = html.replace(
-      new RegExp(`(\\{\\s*name:\\s*'${f.name}',[^}]*?)src:\\s*'[^']*'`),
-      `$1dataUri: '${f.dataUri}'`
-    );
-  });
-
-  // 4c. Embed JSZip inline instead of CDN load
-  html = html.replace(
-    /const s = document\.createElement\('script'\);\s*s\.src = 'https:\/\/cdnjs[^']*';\s*s\.onload = \(\) => resolve\(window\.JSZip\);\s*s\.onerror = reject;\s*document\.head\.appendChild\(s\);/,
-    `// JSZip embedded\n    (function(){${jszipSrc}})();\n    resolve(window.JSZip);`
-  );
-
-  // 4d. Bake in any custom fonts the user already added
-  const customFontScript = fontEmbeds.slice(BUILTIN_FONT_COUNT).map(f => `
-    FONTS.push({ name: '${f.name}', family: \`'${f.name}', sans-serif\`, dataUri: \`${f.dataUri}\` });
-    fontB64Cache['${f.name}'] = \`${f.dataUri}\`;
-    registerFontFace('${f.name}', \`${f.dataUri}\`);`
-  ).join('\n');
-
-  const initMarker = '// ── Init ──';
-  const initReplacement = customFontScript
-    ? `// ── Embedded custom fonts ──\n${customFontScript}\n\n${initMarker}`
-    : initMarker;
-  html = html.replace(initMarker, initReplacement);
-
-  if (customFontScript) {
-    html = html.replace(
-      'loadCustomFonts();\nprefetchFonts();\nupdateTotal();',
-      'loadCustomFonts();\nrebuildFontDropdown();\nprefetchFonts();\nupdateTotal();'
-    );
-  }
-
-  // 5. Download as standalone HTML
-  const blob = new Blob([html], { type: 'text/html' });
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(blob),
-    download: 'sudoku-generator.html',
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
-
-  setStatus(`Packaged! sudoku-generator.html is ready to share ✓`, 'ok');
-  btn.disabled = false;
-  btn.textContent = 'Package for Sharing';
+  CLUE_RANGES[difficulty] = [min, max];
 }
 
 // ── Init ──
