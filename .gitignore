@@ -1,6 +1,9 @@
 # Downloaded zips
 *.zip
 
+# Manuscript PDFs (input samples + generated output) — too large for the repo
+*.pdf
+
 # macOS
 .DS_Store
 __MACOSX/

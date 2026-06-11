@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku Book Builder</title>
+<style>
+  @font-face { font-family:'DIN'; src:url('Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf') format('truetype'); }
+  :root { --ui-font:'DIN', sans-serif; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:#0d0d0d; color:#e0e0e0; font-family:var(--ui-font);
+    display:flex; flex-direction:column; align-items:center; min-height:100vh;
+    padding:36px 20px 80px; gap:24px;
+  }
+  h1 { font-size:2.1rem; letter-spacing:0.12em; color:#fff; text-align:center; }
+  a.back { color:#607d8b; text-decoration:none; font-size:0.85rem; letter-spacing:0.1em; }
+  a.back:hover { color:#90a4ae; }
+  .sub { color:#666; font-size:0.85rem; letter-spacing:0.06em; text-align:center; max-width:640px; }
+
+  .panel {
+    width:100%; max-width:760px; border:1px solid #2a2a2a; padding:20px 24px;
+    display:flex; flex-direction:column; gap:16px;
+  }
+  .panel-title { font-size:0.72rem; letter-spacing:0.2em; color:#555; text-transform:uppercase; }
+
+  /* drop zone */
+  #drop {
+    width:100%; max-width:760px; border:2px dashed #333; padding:46px 20px;
+    text-align:center; color:#888; cursor:pointer; transition:all 0.15s; letter-spacing:0.06em;
+  }
+  #drop:hover, #drop.drag { border-color:#2196f3; color:#bbd; background:#0f1620; }
+  #drop b { color:#90caf9; }
+
+  button {
+    font-family:var(--ui-font); font-size:1rem; letter-spacing:0.1em; padding:11px 26px;
+    border:2px solid #444; background:#1a1a1a; color:#ccc; cursor:pointer; transition:all 0.15s; outline:none;
+  }
+  button:hover { border-color:#aaa; color:#fff; background:#222; }
+  button:disabled { opacity:0.35; cursor:default; }
+  button#btn-generate { border-color:#ffd600; color:#ffd600; }
+  button#btn-generate:hover:not(:disabled) { background:#f9a825; color:#000; }
+
+  table.plan { width:100%; border-collapse:collapse; font-size:0.85rem; }
+  table.plan th, table.plan td { text-align:left; padding:7px 10px; border-bottom:1px solid #1e1e1e; letter-spacing:0.04em; }
+  table.plan th { color:#555; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.12em; }
+  .swatch { width:20px; height:20px; border:1px solid #555; display:inline-block; vertical-align:middle; }
+
+  .palette-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .palette-row input[type=color] { width:34px; height:30px; border:1px solid #333; background:#111; padding:0; cursor:pointer; }
+  .palette-row .pname { width:90px; font-size:0.9rem; letter-spacing:0.05em; }
+  .palette-row input[type=text].hex { width:84px; }
+  .palette-row .count { font-size:0.78rem; color:#888; margin-left:auto; }
+  .palette-row.off { opacity:0.4; }
+
+  input[type=text], input[type=number] {
+    font-family:var(--ui-font); font-size:0.92rem; padding:6px 9px; border:1px solid #333;
+    background:#111; color:#ddd; outline:none; -moz-appearance:textfield;
+  }
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; }
+  input:focus { border-color:#555; }
+  .clue { width:46px; text-align:center; }
+
+  .settings-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px 24px; }
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field label { font-size:0.74rem; letter-spacing:0.08em; color:#777; text-transform:uppercase; }
+  .field .row { display:flex; align-items:center; gap:8px; }
+  select { font-family:var(--ui-font); font-size:0.9rem; padding:6px 9px; border:1px solid #333; background:#111; color:#ddd; outline:none; }
+  .check { display:flex; align-items:center; gap:8px; font-size:0.88rem; color:#bbb; cursor:pointer; }
+  .check input { width:16px; height:16px; }
+
+  #status { font-size:0.85rem; letter-spacing:0.06em; color:#888; min-height:1.2em; text-align:center; }
+  #status.ok { color:#4caf50; } #status.fail { color:#f44336; } #status.warn { color:#ffb300; }
+
+  #bar-track { width:100%; max-width:760px; height:6px; background:#1a1a1a; border:1px solid #2a2a2a; display:none; }
+  #bar-fill { height:100%; width:0%; background:#ffd600; transition:width 0.1s linear; }
+  #detail { font-size:0.75rem; color:#555; min-height:1em; letter-spacing:0.06em; }
+
+  .warn-box { border:1px solid #5d4037; background:#1a1109; color:#ffcc80; padding:10px 14px; font-size:0.82rem; letter-spacing:0.04em; }
+  .hidden { display:none; }
+
+  #previews { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
+  #previews canvas { border:1px solid #333; width:240px; height:auto; background:#fff; }
+  #previews .pv { display:flex; flex-direction:column; gap:6px; align-items:center; }
+  #previews .pv span { font-size:0.72rem; color:#666; letter-spacing:0.1em; text-transform:uppercase; }
+</style>
+</head>
+<body>
+
+<h1>Sudoku Book Builder</h1>
+<a class="back" href="index.html">← single-puzzle generator</a>
+<div class="sub">Upload a manuscript PDF with color-coded placeholder squares. I detect the slots, generate verified sudokus, stamp them in, and renumber the pages &amp; puzzle labels.</div>
+
+<div id="drop">Drop a <b>PDF</b> here, or click to choose &nbsp;·&nbsp; <span style="color:#555">placeholders = solid color squares</span>
+  <input type="file" id="file" accept="application/pdf" style="display:none">
+</div>
+
+<!-- ANALYSIS / PLAN -->
+<div class="panel hidden" id="panel-plan">
+  <div class="panel-title">Detected plan</div>
+  <div id="plan-stats" class="sub" style="text-align:left;color:#999"></div>
+  <table class="plan" id="plan-table"></table>
+  <div class="warn-box hidden" id="mismatch"></div>
+</div>
+
+<!-- PALETTE -->
+<div class="panel hidden" id="panel-palette">
+  <div class="panel-title">Placeholder colors  (difficulty = color)</div>
+  <div id="palette-rows" style="display:flex;flex-direction:column;gap:10px;"></div>
+  <div class="sub" style="text-align:left;color:#555">Tweak a color to match your manuscript; counts update live. Disable a difficulty you don't use.</div>
+</div>
+
+<!-- SETTINGS -->
+<div class="panel hidden" id="panel-settings">
+  <div class="panel-title">Output settings</div>
+  <div class="settings-grid">
+    <div class="field">
+      <label>Print resolution (image DPI)</label>
+      <div class="row">
+        <select id="dpi">
+          <option value="200">200 DPI</option>
+          <option value="300" selected>300 DPI (print)</option>
+          <option value="400">400 DPI</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Puzzle label style</label>
+      <div class="row">
+        <select id="labelcase">
+          <option value="title">Easy 1</option>
+          <option value="upper">EASY 1</option>
+          <option value="lower">easy 1</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Page numbering starts at PDF page</label>
+      <div class="row"><input type="number" id="startPage" value="1" min="1" style="width:70px"></div>
+    </div>
+    <div class="field">
+      <label>…with printed number</label>
+      <div class="row"><input type="number" id="startVal" value="1" min="0" style="width:70px"></div>
+    </div>
+    <div class="field">
+      <label class="check"><input type="checkbox" id="opt-relabel" checked> Renumber puzzle labels</label>
+      <label class="check"><input type="checkbox" id="opt-renumber" checked> Renumber pages</label>
+    </div>
+    <div class="field">
+      <label class="check"><input type="checkbox" id="opt-fillpuz" checked> Fill puzzle slots</label>
+      <label class="check"><input type="checkbox" id="opt-fillans" checked> Fill answer slots</label>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px;justify-content:flex-end;margin-top:4px;">
+    <button id="btn-generate" disabled>Build Book PDF</button>
+  </div>
+</div>
+
+<div id="bar-track"><div id="bar-fill"></div></div>
+<div id="detail"></div>
+<div id="status">Waiting for a PDF…</div>
+
+<div id="previews"></div>
+
+<!-- libs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
+<script src="sudoku-engine.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── Palette (defaults sampled from the example manuscript) ──
+const PALETTE = [
+  { key:'easy',    name:'Easy',    hex:'#7BC96B', role:'puzzle', on:true  },
+  { key:'medium',  name:'Medium',  hex:'#FFEC64', role:'puzzle', on:true  },
+  { key:'hard',    name:'Hard',    hex:'#FF371F', role:'puzzle', on:true  },
+  { key:'extreme', name:'Extreme', hex:'#FF8C00', role:'puzzle', on:true  },
+  { key:'surreal', name:'Surreal', hex:'#9C27B0', role:'puzzle', on:true  },
+  { key:'answer',  name:'Answers', hex:'#08419E', role:'answer', on:true  },
+];
+const DIFF_ORDER = ['easy','medium','hard','extreme','surreal'];
+const CLUE_RANGES = JSON.parse(JSON.stringify(DEFAULT_CLUE_RANGES));
+
+const CONFIG = { colorTol:95, minBoxPt:55, renderScale:1.5 };
+
+let masterBytes = null;   // original PDF bytes for pdf-lib
+let pageCache  = null;    // [{imgData, W, H, Wpt, Hpt, items}]
+let analysis   = null;    // detection result
+let dinBytes   = null;    // DIN font bytes (pdf-lib)
+let dinDataUri = null;    // DIN base64 (svg embed)
+
+// ── helpers ──
+const $ = id => document.getElementById(id);
+function setStatus(msg, cls='') { const e=$('status'); e.textContent=msg; e.className=cls; }
+function hexToRgb(h){ const n=parseInt(h.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function capCase(s, mode){ if(mode==='upper')return s.toUpperCase(); if(mode==='lower')return s.toLowerCase(); return s.charAt(0).toUpperCase()+s.slice(1); }
+
+// ═══════════════════════════════════════════════════════
+// FONT preload (DIN for stamped text + sudoku numbers)
+// ═══════════════════════════════════════════════════════
+async function loadDIN(){
+  const buf = await (await fetch('Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf')).arrayBuffer();
+  dinBytes = new Uint8Array(buf);
+  let bin=''; const b=new Uint8Array(buf); for(let i=0;i<b.length;i++) bin+=String.fromCharCode(b[i]);
+  dinDataUri = 'data:font/truetype;base64,' + btoa(bin);
+}
+
+// ═══════════════════════════════════════════════════════
+// PHASE 1 — render every page once, cache pixels + text
+// ═══════════════════════════════════════════════════════
+async function renderAllPages(bytes){
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const cache = [];
+  const S = CONFIG.renderScale;
+  for (let p=1; p<=doc.numPages; p++){
+    setStatus(`Reading page ${p} / ${doc.numPages}…`);
+    const page = await doc.getPage(p);
+    const vp1  = page.getViewport({ scale:1 });
+    const vp   = page.getViewport({ scale:S });
+    const cv = document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+    const ctx = cv.getContext('2d', { willReadFrequently:true });
+    await page.render({ canvasContext:ctx, viewport:vp }).promise;
+    const imgData = ctx.getImageData(0,0,cv.width,cv.height);
+    cv.remove();
+    const tc = await page.getTextContent();
+    const items = tc.items.filter(it=>it.str.trim()).map(it=>({
+      str: it.str, x: it.transform[4], y: it.transform[5],
+      w: it.width, fs: Math.hypot(it.transform[2], it.transform[3]),
+    }));
+    cache.push({ imgData, W:cv.width, H:cv.height, Wpt:vp1.width, Hpt:vp1.height, items });
+    await new Promise(r=>setTimeout(r,0));
+  }
+  return cache;
+}
+
+// ═══════════════════════════════════════════════════════
+// PHASE 2 — detect boxes from cached pixels (fast; re-run on palette change)
+// ═══════════════════════════════════════════════════════
+function detectBoxesFromCache(pc){
+  const { imgData, W, H, Wpt, Hpt } = pc;
+  const data = imgData.data;
+  const S = CONFIG.renderScale;
+  const pal = PALETTE.filter(c=>c.on).map(c=>({ ...c, rgb:hexToRgb(c.hex) }));
+  const maxD2 = CONFIG.colorTol * CONFIG.colorTol;
+  const lab = new Int16Array(W*H).fill(-1);
+  for (let i=0;i<W*H;i++){
+    const o=i*4, r=data[o], g=data[o+1], b=data[o+2], a=data[o+3];
+    if (a<128) continue;
+    if (r>=240 && g>=240 && b>=240) continue;   // white
+    if (r<=18 && g<=18 && b<=18) continue;       // black
+    let best=-1, bd=Infinity;
+    for (let k=0;k<pal.length;k++){
+      const pr=pal[k].rgb, dr=r-pr[0], dg=g-pr[1], db=b-pr[2], d=dr*dr+dg*dg+db*db;
+      if (d<bd){ bd=d; best=k; }
+    }
+    if (bd<=maxD2) lab[i]=best;
+  }
+  const seen = new Uint8Array(W*H);
+  const minPx = CONFIG.minBoxPt * S;
+  const boxes = [];
+  const stack = new Int32Array(W*H); // reused flood stack
+  for (let i=0;i<W*H;i++){
+    if (seen[i] || lab[i]<0) continue;
+    const key = lab[i];
+    let minx=W, miny=H, maxx=0, maxy=0, n=0, sp=0;
+    stack[sp++]=i; seen[i]=1;
+    while (sp){
+      const q=stack[--sp], x=q%W, y=(q/W)|0; n++;
+      if (x<minx)minx=x; if (x>maxx)maxx=x; if (y<miny)miny=y; if (y>maxy)maxy=y;
+      if (x>0)   { const r=q-1; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
+      if (x<W-1) { const r=q+1; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
+      if (y>0)   { const r=q-W; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
+      if (y<H-1) { const r=q+W; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
+    }
+    const bw=maxx-minx+1, bh=maxy-miny+1;
+    if (bw>=minPx && bh>=minPx){
+      // dilate 2px to recover anti-aliased edge, convert to PDF points (bottom-left)
+      const x0=Math.max(0,minx-2), y0=Math.max(0,miny-2), x1=Math.min(W-1,maxx+2), y1=Math.min(H-1,maxy+2);
+      const c = pal[key];
+      boxes.push({
+        key:c.key, role:c.role,
+        rect:{ x:x0/S, y:Hpt-(y1+1)/S, w:(x1-x0+1)/S, h:(y1-y0+1)/S },
+      });
+    }
+  }
+  return boxes;
+}
+
+function detect(){
+  const pages = pageCache.map((pc,i)=>({ index:i+1, Wpt:pc.Wpt, Hpt:pc.Hpt, items:pc.items, boxes:detectBoxesFromCache(pc) }));
+  analysis = { numPages: pageCache.length, pages };
+  return analysis;
+}
+
+// reading order: top→bottom (PDF y desc) with row tolerance, then left→right
+function boxReadingOrder(a,b){
+  const at=a.rect.y+a.rect.h, bt=b.rect.y+b.rect.h;
+  if (Math.abs(at-bt) > 24) return bt-at;
+  return a.rect.x-b.rect.x;
+}
+
+function buildPlan(){
+  const puzzleBoxes = {}; DIFF_ORDER.forEach(d=>puzzleBoxes[d]=[]);
+  const answerBoxes = [];
+  for (const pg of analysis.pages){
+    const sorted = [...pg.boxes].sort(boxReadingOrder);
+    for (const b of sorted){
+      const ref = { page:pg.index, rect:b.rect, key:b.key };
+      if (b.key==='answer') answerBoxes.push(ref);
+      else if (puzzleBoxes[b.key]) puzzleBoxes[b.key].push(ref);
+    }
+  }
+  return { puzzleBoxes, answerBoxes };
+}
+
+// ═══════════════════════════════════════════════════════
+// UI rendering of plan + palette
+// ═══════════════════════════════════════════════════════
+function renderPlanUI(){
+  const plan = buildPlan();
+  const totalPuz = DIFF_ORDER.reduce((s,d)=>s+plan.puzzleBoxes[d].length,0);
+  const totalAns = plan.answerBoxes.length;
+
+  $('plan-stats').innerHTML =
+    `<b style="color:#ccc">${analysis.numPages}</b> pages · <b style="color:#ccc">${totalPuz}</b> puzzle slots · <b style="color:#ccc">${totalAns}</b> answer slots`;
+
+  let rows = `<tr><th>Difficulty</th><th>Color</th><th>Puzzle slots</th></tr>`;
+  for (const d of DIFF_ORDER){
+    const c = PALETTE.find(p=>p.key===d);
+    if (!c.on) continue;
+    const n = plan.puzzleBoxes[d].length;
+    rows += `<tr><td style="text-transform:capitalize">${d}</td>`
+         +  `<td><span class="swatch" style="background:${c.hex}"></span></td>`
+         +  `<td>${n}</td></tr>`;
+  }
+  const ans = PALETTE.find(p=>p.key==='answer');
+  rows += `<tr><td>Answers</td><td><span class="swatch" style="background:${ans.hex}"></span></td><td>${totalAns}</td></tr>`;
+  $('plan-table').innerHTML = rows;
+
+  const mm = $('mismatch');
+  if (totalAns>0 && totalAns!==totalPuz){
+    mm.classList.remove('hidden');
+    mm.textContent = `⚠ ${totalPuz} puzzle slots but ${totalAns} answer slots. They should match so every puzzle has a solution. I'll fill in reading order and leave any extras blank.`;
+  } else mm.classList.add('hidden');
+
+  $('btn-generate').disabled = totalPuz===0 && totalAns===0;
+
+  // palette counts
+  for (const c of PALETTE){
+    const el = document.querySelector(`#prow-${c.key} .count`);
+    if (!el) continue;
+    const n = c.key==='answer' ? totalAns : plan.puzzleBoxes[c.key].length;
+    el.textContent = `${n} slot${n===1?'':'s'} detected`;
+  }
+}
+
+function renderPaletteUI(){
+  const host = $('palette-rows'); host.innerHTML='';
+  for (const c of PALETTE){
+    const isPuzzle = c.role==='puzzle';
+    const cr = CLUE_RANGES[c.key] || [0,0];
+    const row = document.createElement('div');
+    row.className = 'palette-row' + (c.on?'':' off');
+    row.id = `prow-${c.key}`;
+    row.innerHTML =
+      `<input type="checkbox" ${c.on?'checked':''} title="use this difficulty">`+
+      `<input type="color" value="${c.hex}">`+
+      `<input type="text" class="hex" value="${c.hex}">`+
+      `<span class="pname">${c.name}</span>`+
+      (isPuzzle
+        ? `<span style="font-size:0.74rem;color:#555">clues</span>
+           <input type="number" class="clue" value="${cr[0]}" min="17" max="80">
+           <span style="color:#444">–</span>
+           <input type="number" class="clue" value="${cr[1]}" min="17" max="80">`
+        : ``)+
+      `<span class="count"></span>`;
+    host.appendChild(row);
+
+    const [chk, colp, hex] = row.querySelectorAll('input');
+    const clues = row.querySelectorAll('input.clue');
+    chk.onchange   = () => { c.on=chk.checked; row.classList.toggle('off',!c.on); detect(); renderPlanUI(); };
+    colp.oninput   = () => { c.hex=colp.value.toUpperCase(); hex.value=c.hex; detect(); renderPlanUI(); };
+    hex.onchange   = () => { if(/^#?[0-9a-fA-F]{6}$/.test(hex.value)){ c.hex='#'+hex.value.replace('#',''); colp.value=c.hex; detect(); renderPlanUI(); } };
+    if (clues.length){
+      clues[0].oninput = () => { CLUE_RANGES[c.key][0]=parseInt(clues[0].value,10); };
+      clues[1].oninput = () => { CLUE_RANGES[c.key][1]=parseInt(clues[1].value,10); };
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// PDF WRITE — stamping
+// ═══════════════════════════════════════════════════════
+const { rgb } = PDFLib;
+
+function coverText(pg, it){
+  const asc=it.fs*0.82, desc=it.fs*0.30, pad=1.3;
+  pg.drawRectangle({ x:it.x-pad, y:it.y-desc-pad, width:it.w+pad*2, height:asc+desc+pad*2, color:rgb(1,1,1) });
+}
+
+function eraseAndDraw(pg, rect, img){
+  pg.drawRectangle({ x:rect.x-1.5, y:rect.y-1.5, width:rect.w+3, height:rect.h+3, color:rgb(1,1,1) });
+  pg.drawImage(img, { x:rect.x, y:rect.y, width:rect.w, height:rect.h });
+}
+
+function stampLabel(pg, pageData, boxRef, font, text){
+  const topY = boxRef.rect.y + boxRef.rect.h;
+  const L = boxRef.rect.x, R = boxRef.rect.x + boxRef.rect.w;
+  const labelItems = pageData.items.filter(it=>{
+    if (it.fs>14) return false;
+    const cx = it.x + it.w/2;
+    return it.y >= topY-3 && it.y <= topY+24 && cx >= L-25 && cx <= R+25;
+  });
+  let baseY, centerX, size;
+  if (labelItems.length){
+    const minX=Math.min(...labelItems.map(it=>it.x));
+    const maxX=Math.max(...labelItems.map(it=>it.x+it.w));
+    baseY   = labelItems.reduce((s,it)=>s+it.y,0)/labelItems.length;
+    centerX = (minX+maxX)/2;
+    size    = Math.max(...labelItems.map(it=>it.fs));
+    labelItems.forEach(it=>coverText(pg,it));
+  } else {
+    baseY = topY+4; centerX=(L+R)/2; size=10.8;
+  }
+  const tw = font.widthOfTextAtSize(text, size);
+  pg.drawText(text, { x:centerX-tw/2, y:baseY, size, font, color:rgb(0,0,0) });
+}
+
+function stampPageNumbers(pages, font){
+  const startPage = parseInt($('startPage').value,10) || 1;
+  const startVal  = parseInt($('startVal').value,10);
+  for (let p=startPage; p<=pages.length; p++){
+    const pageData = analysis.pages[p-1];
+    const cand = pageData.items.filter(it=>/^\d+$/.test(it.str.trim()) && it.fs>=15);
+    if (!cand.length) continue;            // dividers / unnumbered pages
+    // pick the candidate closest to a vertical page edge (real page number)
+    cand.sort((a,b)=> Math.min(a.y, pageData.Hpt-a.y) - Math.min(b.y, pageData.Hpt-b.y));
+    const it = cand[0];
+    const num = String(startVal + (p - startPage));
+    coverText(pages[p-1], it);
+    const size = it.fs;
+    const tw = font.widthOfTextAtSize(num, size);
+    const cx = it.x + it.w/2;
+    pages[p-1].drawText(num, { x:cx-tw/2, y:it.y, size, font, color:rgb(0,0,0) });
+  }
+}
+
+function renderSudokuSVG(puzzle, solution, showSolution){
+  return buildSudokuSVGString({
+    puzzle, solution, showSolution,
+    fontName:'DIN', fontFamily:"'DIN', sans-serif", dataUri:dinDataUri, fontSize:38,
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN — build the book
+// ═══════════════════════════════════════════════════════
+async function buildBook(){
+  const plan = buildPlan();
+  const dpi  = parseInt($('dpi').value,10);
+  const labelMode = $('labelcase').value;
+  const doRelabel  = $('opt-relabel').checked;
+  const doRenumber = $('opt-renumber').checked;
+  const doFillPuz  = $('opt-fillpuz').checked;
+  const doFillAns  = $('opt-fillans').checked;
+
+  $('btn-generate').disabled = true;
+  $('bar-track').style.display='block';
+  const fill=$('bar-fill'); fill.style.width='0%';
+  $('previews').innerHTML='';
+
+  // total work for progress
+  const totalPuz = DIFF_ORDER.reduce((s,d)=>s+plan.puzzleBoxes[d].length,0);
+  let rangeMisses = 0;
+
+  // 1) generate puzzles per difficulty (reading order)
+  const generated = {}; let made=0;
+  for (const d of DIFF_ORDER){
+    generated[d]=[];
+    const need = plan.puzzleBoxes[d].length;
+    for (let i=0;i<need;i++){
+      let res = generatePuzzleInRange(d, CLUE_RANGES, 40);
+      if (!res){ res = generatePuzzle(d, CLUE_RANGES); rangeMisses++; }
+      if (!solve(res.puzzle)){ i--; continue; }
+      generated[d].push(res);
+      made++;
+      $('detail').textContent = `Generating ${d} ${i+1}/${need}`;
+      fill.style.width = (made/Math.max(1,totalPuz)*40).toFixed(1)+'%';
+      if (made%3===0) await new Promise(r=>setTimeout(r,0));
+    }
+  }
+
+  // 2) open with pdf-lib, embed font
+  setStatus('Stamping pages…'); $('detail').textContent='';
+  const pdfDoc = await PDFLib.PDFDocument.load(masterBytes.slice());
+  pdfDoc.registerFontkit(window.fontkit);
+  const font  = await pdfDoc.embedFont(dinBytes);
+  const pages = pdfDoc.getPages();
+
+  // 3) place puzzles
+  let placed=0;
+  const placeTotal = (doFillPuz?totalPuz:0) + (doFillAns?plan.answerBoxes.length:0);
+  const bump = () => { placed++; fill.style.width=(40 + placed/Math.max(1,placeTotal)*55).toFixed(1)+'%'; };
+
+  if (doFillPuz){
+    for (const d of DIFF_ORDER){
+      const boxes = plan.puzzleBoxes[d];
+      for (let i=0;i<boxes.length;i++){
+        const res = generated[d][i];
+        const px  = Math.round(boxes[i].rect.w/72*dpi);
+        const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, null, false), px);
+        const img = await pdfDoc.embedPng(png);
+        const pg  = pages[boxes[i].page-1];
+        eraseAndDraw(pg, boxes[i].rect, img);
+        if (doRelabel) stampLabel(pg, analysis.pages[boxes[i].page-1], boxes[i], font, `${capCase(d,labelMode)} ${i+1}`);
+        bump(); $('detail').textContent=`Placing ${d} puzzle ${i+1}/${boxes.length}`;
+        await new Promise(r=>setTimeout(r,0));
+      }
+    }
+  }
+
+  // 4) place answers — reading order, grouped easy→…→surreal
+  if (doFillAns){
+    const flat=[];
+    for (const d of DIFF_ORDER) generated[d].forEach((res,i)=>flat.push({ d, idx:i+1, res }));
+    const aboxes = plan.answerBoxes;
+    for (let j=0;j<aboxes.length && j<flat.length;j++){
+      const { d, idx, res } = flat[j];
+      const px  = Math.round(aboxes[j].rect.w/72*dpi);
+      const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, res.solution, true), px);
+      const img = await pdfDoc.embedPng(png);
+      const pg  = pages[aboxes[j].page-1];
+      eraseAndDraw(pg, aboxes[j].rect, img);
+      if (doRelabel) stampLabel(pg, analysis.pages[aboxes[j].page-1], aboxes[j], font, `${capCase(d,labelMode)} ${idx}`);
+      bump(); $('detail').textContent=`Placing answer ${j+1}/${aboxes.length}`;
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+
+  // 5) page numbers
+  if (doRenumber){ setStatus('Renumbering pages…'); stampPageNumbers(pages, font); }
+
+  // 6) save + download
+  fill.style.width='98%'; setStatus('Saving PDF…');
+  const out = await pdfDoc.save();
+  const blob = new Blob([out], { type:'application/pdf' });
+  const a = Object.assign(document.createElement('a'), { href:URL.createObjectURL(blob), download:'sudoku_book_filled.pdf' });
+  a.click(); URL.revokeObjectURL(a.href);
+
+  fill.style.width='100%';
+  const warn = rangeMisses ? `  (⚠ ${rangeMisses} puzzle${rangeMisses===1?'':'s'} fell outside the dialed clue range)` : '';
+  setStatus(`Done — ${made} puzzles placed, PDF downloaded ✓${warn}`, rangeMisses?'warn':'ok');
+  $('detail').textContent='';
+  $('btn-generate').disabled=false;
+
+  // 7) preview a couple output pages
+  await previewOutput(out);
+}
+
+async function previewOutput(bytes){
+  try {
+    const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+    // first page that had a puzzle, first that had an answer
+    const plan = buildPlan();
+    const firstPuzPage = DIFF_ORDER.map(d=>plan.puzzleBoxes[d][0]).find(Boolean)?.page;
+    const firstAnsPage = plan.answerBoxes[0]?.page;
+    const want = [...new Set([firstPuzPage, firstAnsPage].filter(Boolean))].slice(0,2);
+    for (const pn of want){
+      const page = await doc.getPage(pn);
+      const vp = page.getViewport({ scale:1 });
+      const cv = document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+      await page.render({ canvasContext:cv.getContext('2d'), viewport:vp }).promise;
+      const pv = document.createElement('div'); pv.className='pv';
+      pv.innerHTML = `<span>output page ${pn}</span>`;
+      pv.appendChild(cv);
+      $('previews').appendChild(pv);
+    }
+  } catch(e){ /* preview is best-effort */ }
+}
+
+// ═══════════════════════════════════════════════════════
+// FILE INTAKE
+// ═══════════════════════════════════════════════════════
+async function handleFile(file){
+  if (!file || file.type!=='application/pdf'){ setStatus('Please choose a PDF.', 'fail'); return; }
+  setStatus('Loading PDF…');
+  $('previews').innerHTML='';
+  const buf = await file.arrayBuffer();
+  masterBytes = new Uint8Array(buf);
+  if (!dinBytes) await loadDIN();
+  pageCache = await renderAllPages(masterBytes);
+  detect();
+  renderPaletteUI();
+  renderPlanUI();
+  ['panel-plan','panel-palette','panel-settings'].forEach(id=>$(id).classList.remove('hidden'));
+  $('bar-track').style.display='none';
+  const totalPuz = DIFF_ORDER.reduce((s,d)=>s+buildPlan().puzzleBoxes[d].length,0);
+  setStatus(`Analyzed ${analysis.numPages} pages — ${totalPuz} puzzle slots found. Review colors & settings, then build.`, 'ok');
+}
+
+const drop=$('drop'), fileInput=$('file');
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=e=>handleFile(e.target.files[0]);
+drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('drag'); };
+drop.ondragleave=()=>drop.classList.remove('drag');
+drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); };
+$('btn-generate').onclick=()=>buildBook().catch(err=>{ setStatus('Error: '+err.message,'fail'); $('btn-generate').disabled=false; console.error(err); });
+</script>
+</body>
+</html>
