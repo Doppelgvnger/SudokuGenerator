@@ -110,8 +110,8 @@
   <div class="sub" style="text-align:left;color:#555">Tweak a color to match your manuscript; counts update live. Disable a difficulty you don't use.</div>
 </div>
 
-<!-- FONTS -->
-<div class="panel hidden" id="panel-fonts">
+<!-- FONTS — always visible; choices don't depend on the PDF -->
+<div class="panel" id="panel-fonts">
   <div class="panel-title">Fonts</div>
   <div class="settings-grid">
     <div class="field">
@@ -744,7 +744,7 @@ async function handleFile(file){
   detect();
   renderPaletteUI();
   renderPlanUI();
-  ['panel-plan','panel-palette','panel-fonts','panel-settings'].forEach(id=>$(id).classList.remove('hidden'));
+  ['panel-plan','panel-palette','panel-settings'].forEach(id=>$(id).classList.remove('hidden'));
   $('bar-track').style.display='none';
   const totalPuz = DIFF_ORDER.reduce((s,d)=>s+buildPlan().puzzleBoxes[d].length,0);
   setStatus(`Analyzed ${analysis.numPages} pages — ${totalPuz} puzzle slots found. Review colors & settings, then build.`, 'ok');
