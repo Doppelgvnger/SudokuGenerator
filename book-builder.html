@@ -183,7 +183,16 @@ const PALETTE = [
 const DIFF_ORDER = ['easy','medium','hard','extreme','surreal'];
 const CLUE_RANGES = JSON.parse(JSON.stringify(DEFAULT_CLUE_RANGES));
 
-const CONFIG = { colorTol:95, minBoxPt:55, renderScale:1.5 };
+const CONFIG = {
+  colorTol:60,      // max RGB distance to count a pixel as a palette color.
+                    // Kept tight: a yellow box bleeding into a black splatter
+                    // passes through olive tones ~75 from green, so 60 avoids
+                    // misreading those edges as a different difficulty's color.
+  minBoxPt:55,      // min box side (points)
+  renderScale:1.5,  // page render scale for detection
+  minFill:0.4,      // min (pixels / bbox-area): solid squares pass, thin AA edge-bands don't
+  mergeGapPx:14,    // merge same-color fragments whose bboxes are within this gap (splatter splits)
+};
 
 let masterBytes = null;   // original PDF bytes for pdf-lib
 let pageCache  = null;    // [{imgData, W, H, Wpt, Hpt, items}]
@@ -257,10 +266,10 @@ function detectBoxesFromCache(pc){
     }
     if (bd<=maxD2) lab[i]=best;
   }
+  // ── connected components (track pixel area + bbox) ──
   const seen = new Uint8Array(W*H);
-  const minPx = CONFIG.minBoxPt * S;
-  const boxes = [];
-  const stack = new Int32Array(W*H); // reused flood stack
+  const stack = new Int32Array(W*H);
+  let raw = [];
   for (let i=0;i<W*H;i++){
     if (seen[i] || lab[i]<0) continue;
     const key = lab[i];
@@ -274,16 +283,49 @@ function detectBoxesFromCache(pc){
       if (y>0)   { const r=q-W; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
       if (y<H-1) { const r=q+W; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
     }
-    const bw=maxx-minx+1, bh=maxy-miny+1;
-    if (bw>=minPx && bh>=minPx){
-      // dilate 2px to recover anti-aliased edge, convert to PDF points (bottom-left)
-      const x0=Math.max(0,minx-2), y0=Math.max(0,miny-2), x1=Math.min(W-1,maxx+2), y1=Math.min(H-1,maxy+2);
-      const c = pal[key];
-      boxes.push({
-        key:c.key, role:c.role,
-        rect:{ x:x0/S, y:Hpt-(y1+1)/S, w:(x1-x0+1)/S, h:(y1-y0+1)/S },
-      });
-    }
+    raw.push({ key, minx, miny, maxx, maxy, n });
+  }
+
+  // ── drop thin / sparse blobs: a real placeholder is a SOLID square, so its
+  //    pixel count fills most of its bounding box. Anti-aliased edge-bands
+  //    (e.g. a yellow box bleeding into a black splatter, which can read as
+  //    green) trace a thin curve with a very low fill ratio — reject those. ──
+  raw = raw.filter(c => {
+    const bw=c.maxx-c.minx+1, bh=c.maxy-c.miny+1;
+    return c.n >= CONFIG.minFill * bw * bh;
+  });
+
+  // ── merge fragments of one box split by an overlapping splatter ──
+  const G = CONFIG.mergeGapPx;
+  const parent = raw.map((_,i)=>i);
+  const find = a => { while(parent[a]!==a){ parent[a]=parent[parent[a]]; a=parent[a]; } return a; };
+  for (let a=0;a<raw.length;a++) for (let b=a+1;b<raw.length;b++){
+    if (raw[a].key!==raw[b].key) continue;
+    const xgap = Math.max(0, Math.max(raw[a].minx,raw[b].minx) - Math.min(raw[a].maxx,raw[b].maxx));
+    const ygap = Math.max(0, Math.max(raw[a].miny,raw[b].miny) - Math.min(raw[a].maxy,raw[b].maxy));
+    if (xgap<=G && ygap<=G) parent[find(a)] = find(b);
+  }
+  const merged = {};
+  for (let i=0;i<raw.length;i++){
+    const r=find(i), c=raw[i];
+    if (!merged[r]) merged[r] = { key:c.key, minx:c.minx, miny:c.miny, maxx:c.maxx, maxy:c.maxy };
+    else { const m=merged[r]; m.minx=Math.min(m.minx,c.minx); m.miny=Math.min(m.miny,c.miny); m.maxx=Math.max(m.maxx,c.maxx); m.maxy=Math.max(m.maxy,c.maxy); }
+  }
+
+  // ── keep boxes of plausible size; convert to PDF points (bottom-left) ──
+  const minPx = CONFIG.minBoxPt * S;
+  const boxes = [];
+  for (const k in merged){
+    const m = merged[k];
+    const bw=m.maxx-m.minx+1, bh=m.maxy-m.miny+1;
+    if (bw<minPx || bh<minPx) continue;
+    const c = pal[m.key];
+    // dilate 2px to recover the anti-aliased edge
+    const x0=Math.max(0,m.minx-2), y0=Math.max(0,m.miny-2), x1=Math.min(W-1,m.maxx+2), y1=Math.min(H-1,m.maxy+2);
+    boxes.push({
+      key:c.key, role:c.role,
+      rect:{ x:x0/S, y:Hpt-(y1+1)/S, w:(x1-x0+1)/S, h:(y1-y0+1)/S },
+    });
   }
   return boxes;
 }
@@ -400,32 +442,37 @@ function coverText(pg, it){
   pg.drawRectangle({ x:it.x-pad, y:it.y-desc-pad, width:it.w+pad*2, height:asc+desc+pad*2, color:rgb(1,1,1) });
 }
 
-function eraseAndDraw(pg, rect, img){
-  pg.drawRectangle({ x:rect.x-1.5, y:rect.y-1.5, width:rect.w+3, height:rect.h+3, color:rgb(1,1,1) });
+// The sudoku PNG is opaque with a white background and a full-bleed grid, so
+// it fully covers the colored placeholder on its own — NO white border around it.
+function placeImage(pg, rect, img){
   pg.drawImage(img, { x:rect.x, y:rect.y, width:rect.w, height:rect.h });
 }
 
-function stampLabel(pg, pageData, boxRef, font, text){
+// Locate the existing label text just above a box (so we can cover + replace it).
+function findLabel(pageData, boxRef){
   const topY = boxRef.rect.y + boxRef.rect.h;
   const L = boxRef.rect.x, R = boxRef.rect.x + boxRef.rect.w;
-  const labelItems = pageData.items.filter(it=>{
+  const items = pageData.items.filter(it=>{
     if (it.fs>14) return false;
     const cx = it.x + it.w/2;
     return it.y >= topY-3 && it.y <= topY+24 && cx >= L-25 && cx <= R+25;
   });
-  let baseY, centerX, size;
-  if (labelItems.length){
-    const minX=Math.min(...labelItems.map(it=>it.x));
-    const maxX=Math.max(...labelItems.map(it=>it.x+it.w));
-    baseY   = labelItems.reduce((s,it)=>s+it.y,0)/labelItems.length;
-    centerX = (minX+maxX)/2;
-    size    = Math.max(...labelItems.map(it=>it.fs));
-    labelItems.forEach(it=>coverText(pg,it));
-  } else {
-    baseY = topY+4; centerX=(L+R)/2; size=10.8;
-  }
-  const tw = font.widthOfTextAtSize(text, size);
-  pg.drawText(text, { x:centerX-tw/2, y:baseY, size, font, color:rgb(0,0,0) });
+  if (!items.length) return null;
+  const minX=Math.min(...items.map(it=>it.x));
+  const maxX=Math.max(...items.map(it=>it.x+it.w));
+  return {
+    items,
+    baseY:   items.reduce((s,it)=>s+it.y,0)/items.length,
+    centerX: (minX+maxX)/2,
+    size:    Math.max(...items.map(it=>it.fs)),
+  };
+}
+function defaultLabelPos(boxRef){
+  return { items:[], baseY:boxRef.rect.y+boxRef.rect.h+4, centerX:boxRef.rect.x+boxRef.rect.w/2, size:10.8 };
+}
+function drawLabelText(pg, pos, text, font){
+  const tw = font.widthOfTextAtSize(text, pos.size);
+  pg.drawText(text, { x:pos.centerX-tw/2, y:pos.baseY, size:pos.size, font, color:rgb(0,0,0) });
 }
 
 function stampPageNumbers(pages, font){
@@ -509,12 +556,17 @@ async function buildBook(){
       const boxes = plan.puzzleBoxes[d];
       for (let i=0;i<boxes.length;i++){
         const res = generated[d][i];
-        const px  = Math.round(boxes[i].rect.w/72*dpi);
+        const box = boxes[i];
+        const pg  = pages[box.page-1];
+        const pageData = analysis.pages[box.page-1];
+        // cover the old label FIRST, so the image then paints over any overlap
+        const lbl = doRelabel ? findLabel(pageData, box) : null;
+        if (lbl) lbl.items.forEach(it=>coverText(pg,it));
+        const px  = Math.round(box.rect.w/72*dpi);
         const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, null, false), px);
         const img = await pdfDoc.embedPng(png);
-        const pg  = pages[boxes[i].page-1];
-        eraseAndDraw(pg, boxes[i].rect, img);
-        if (doRelabel) stampLabel(pg, analysis.pages[boxes[i].page-1], boxes[i], font, `${capCase(d,labelMode)} ${i+1}`);
+        placeImage(pg, box.rect, img);
+        if (doRelabel) drawLabelText(pg, lbl || defaultLabelPos(box), `${capCase(d,labelMode)} ${i+1}`, font);
         bump(); $('detail').textContent=`Placing ${d} puzzle ${i+1}/${boxes.length}`;
         await new Promise(r=>setTimeout(r,0));
       }
@@ -528,12 +580,16 @@ async function buildBook(){
     const aboxes = plan.answerBoxes;
     for (let j=0;j<aboxes.length && j<flat.length;j++){
       const { d, idx, res } = flat[j];
-      const px  = Math.round(aboxes[j].rect.w/72*dpi);
+      const box = aboxes[j];
+      const pg  = pages[box.page-1];
+      const pageData = analysis.pages[box.page-1];
+      const lbl = doRelabel ? findLabel(pageData, box) : null;
+      if (lbl) lbl.items.forEach(it=>coverText(pg,it));
+      const px  = Math.round(box.rect.w/72*dpi);
       const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, res.solution, true), px);
       const img = await pdfDoc.embedPng(png);
-      const pg  = pages[aboxes[j].page-1];
-      eraseAndDraw(pg, aboxes[j].rect, img);
-      if (doRelabel) stampLabel(pg, analysis.pages[aboxes[j].page-1], aboxes[j], font, `${capCase(d,labelMode)} ${idx}`);
+      placeImage(pg, box.rect, img);
+      if (doRelabel) drawLabelText(pg, lbl || defaultLabelPos(box), `${capCase(d,labelMode)} ${idx}`, font);
       bump(); $('detail').textContent=`Placing answer ${j+1}/${aboxes.length}`;
       await new Promise(r=>setTimeout(r,0));
     }
