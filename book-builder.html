@@ -110,6 +110,33 @@
   <div class="sub" style="text-align:left;color:#555">Tweak a color to match your manuscript; counts update live. Disable a difficulty you don't use.</div>
 </div>
 
+<!-- FONTS -->
+<div class="panel hidden" id="panel-fonts">
+  <div class="panel-title">Fonts</div>
+  <div class="settings-grid">
+    <div class="field">
+      <label>Sudoku numbers</label>
+      <div class="row"><select id="font-sudoku" style="flex:1"></select></div>
+    </div>
+    <div class="field">
+      <label>Puzzle labels (e.g. “Easy 1”)</label>
+      <div class="row"><select id="font-label" style="flex:1"></select></div>
+    </div>
+    <div class="field">
+      <label>Page numbers</label>
+      <div class="row"><select id="font-page" style="flex:1"></select></div>
+    </div>
+    <div class="field">
+      <label>Add your own font</label>
+      <div class="row">
+        <button type="button" id="btn-addfont" style="padding:7px 16px;font-size:0.85rem;letter-spacing:0.06em;">＋ Upload .ttf / .otf</button>
+        <input type="file" id="fontfile" accept=".ttf,.otf" style="display:none">
+      </div>
+    </div>
+  </div>
+  <div class="sub" style="text-align:left;color:#555">Each of the three can use a different font. Uploaded fonts are embedded in the PDF and remembered in this browser.</div>
+</div>
+
 <!-- SETTINGS -->
 <div class="panel hidden" id="panel-settings">
   <div class="panel-title">Output settings</div>
@@ -189,7 +216,8 @@ const CONFIG = {
                     // passes through olive tones ~75 from green, so 60 avoids
                     // misreading those edges as a different difficulty's color.
   minBoxPt:55,      // min box side (points)
-  renderScale:1.5,  // page render scale for detection
+  renderScale:1.0,  // page render scale for detection (1.0 ≈ 1px/pt; fast, and
+                    // box rects are dilated 2px anyway so the precision is plenty)
   minFill:0.4,      // min (pixels / bbox-area): solid squares pass, thin AA edge-bands don't
   mergeGapPx:14,    // merge same-color fragments whose bboxes are within this gap (splatter splits)
 };
@@ -197,8 +225,18 @@ const CONFIG = {
 let masterBytes = null;   // original PDF bytes for pdf-lib
 let pageCache  = null;    // [{imgData, W, H, Wpt, Hpt, items}]
 let analysis   = null;    // detection result
-let dinBytes   = null;    // DIN font bytes (pdf-lib)
-let dinDataUri = null;    // DIN base64 (svg embed)
+
+// ── Font registry, shared by the 3 pickers (sudoku numbers / labels / page
+//    numbers). Each font carries a base64 dataUri (for the canvas-rendered
+//    sudoku numbers) and raw bytes (for pdf-lib embedding of stamped text).
+//    Built-ins are fetched lazily from src; custom uploads persist locally. ──
+const FONTS = [
+  { name:'DIN',      src:'Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf' },
+  { name:'Surreal',  src:'Fonts/surreal-psychedelic-typeface/Surreal.ttf' },
+  { name:'Vincendo', src:'Fonts/vincendo/Vincendo-Regular.ttf' },
+];
+const BUILTIN_FONT_COUNT = FONTS.length;
+const CUSTOM_FONTS_KEY = 'bookbuilder_custom_fonts';
 
 // ── helpers ──
 const $ = id => document.getElementById(id);
@@ -207,13 +245,62 @@ function hexToRgb(h){ const n=parseInt(h.replace('#',''),16); return [(n>>16)&25
 function capCase(s, mode){ if(mode==='upper')return s.toUpperCase(); if(mode==='lower')return s.toLowerCase(); return s.charAt(0).toUpperCase()+s.slice(1); }
 
 // ═══════════════════════════════════════════════════════
-// FONT preload (DIN for stamped text + sudoku numbers)
+// FONTS
 // ═══════════════════════════════════════════════════════
-async function loadDIN(){
-  const buf = await (await fetch('Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf')).arrayBuffer();
-  dinBytes = new Uint8Array(buf);
-  let bin=''; const b=new Uint8Array(buf); for(let i=0;i<b.length;i++) bin+=String.fromCharCode(b[i]);
-  dinDataUri = 'data:font/truetype;base64,' + btoa(bin);
+function bufToDataUri(buf){
+  const b=new Uint8Array(buf); let bin='';
+  for (let i=0;i<b.length;i++) bin+=String.fromCharCode(b[i]);
+  return 'data:font/truetype;base64,'+btoa(bin);
+}
+function b64ToBytes(b64){
+  const bin=atob(b64); const a=new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i);
+  return a;
+}
+// Ensure a font has both its bytes (pdf-lib) and dataUri (SVG) ready.
+async function ensureFont(f){
+  if (!f.dataUri && f.src){
+    const buf = await (await fetch(f.src)).arrayBuffer();
+    f.dataUri = bufToDataUri(buf);
+    f.bytes   = new Uint8Array(buf);
+  }
+  if (!f.bytes && f.dataUri) f.bytes = b64ToBytes(f.dataUri.split(',')[1]);
+  return f;
+}
+
+function loadStoredFonts(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(CUSTOM_FONTS_KEY) || '[]');
+    saved.forEach(s => FONTS.push({ name:s.name, dataUri:s.dataUri }));
+  } catch(e){}
+}
+function saveStoredFonts(){
+  const custom = FONTS.slice(BUILTIN_FONT_COUNT).map(f=>({ name:f.name, dataUri:f.dataUri }));
+  localStorage.setItem(CUSTOM_FONTS_KEY, JSON.stringify(custom));
+}
+
+function populateFontSelects(){
+  for (const id of ['font-sudoku','font-label','font-page']){
+    const sel = $(id); if (!sel) continue;
+    const cur = sel.value || '0';
+    sel.innerHTML = FONTS.map((f,i)=>`<option value="${i}">${f.name}${i>=BUILTIN_FONT_COUNT?' ★':''}</option>`).join('');
+    sel.value = (cur < FONTS.length) ? cur : '0';
+  }
+}
+
+function triggerAddFont(){ const fi=$('fontfile'); fi.value=''; fi.click(); }
+function addFontFromFile(ev){
+  const file = ev.target.files[0]; if (!file) return;
+  const def  = file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  const name = (prompt('Font name:', def) || '').trim(); if (!name) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    FONTS.push({ name, dataUri:e.target.result });
+    saveStoredFonts();
+    populateFontSelects();
+    setStatus(`Added font “${name}”. Choose it in the font menus.`, 'ok');
+  };
+  reader.readAsDataURL(file);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -494,10 +581,10 @@ function stampPageNumbers(pages, font){
   }
 }
 
-function renderSudokuSVG(puzzle, solution, showSolution){
+function renderSudokuSVG(puzzle, solution, showSolution, f){
   return buildSudokuSVGString({
     puzzle, solution, showSolution,
-    fontName:'DIN', fontFamily:"'DIN', sans-serif", dataUri:dinDataUri, fontSize:38,
+    fontName:f.name, fontFamily:`'${f.name}', sans-serif`, dataUri:f.dataUri, fontSize:38,
   });
 }
 
@@ -539,11 +626,18 @@ async function buildBook(){
     }
   }
 
-  // 2) open with pdf-lib, embed font
+  // 2) resolve the three chosen fonts (load bytes + dataUri)
+  const fSudoku = FONTS[parseInt($('font-sudoku').value,10)] || FONTS[0];
+  const fLabel  = FONTS[parseInt($('font-label').value,10)]  || FONTS[0];
+  const fPage   = FONTS[parseInt($('font-page').value,10)]   || FONTS[0];
+  await Promise.all([ensureFont(fSudoku), ensureFont(fLabel), ensureFont(fPage)]);
+
+  // 3) open with pdf-lib, embed the label + page-number fonts
   setStatus('Stamping pages…'); $('detail').textContent='';
   const pdfDoc = await PDFLib.PDFDocument.load(masterBytes.slice());
   pdfDoc.registerFontkit(window.fontkit);
-  const font  = await pdfDoc.embedFont(dinBytes);
+  const labelFont = await pdfDoc.embedFont(fLabel.bytes);
+  const pageFont  = (fPage===fLabel) ? labelFont : await pdfDoc.embedFont(fPage.bytes);
   const pages = pdfDoc.getPages();
 
   // 3) place puzzles
@@ -563,10 +657,10 @@ async function buildBook(){
         const lbl = doRelabel ? findLabel(pageData, box) : null;
         if (lbl) lbl.items.forEach(it=>coverText(pg,it));
         const px  = Math.round(box.rect.w/72*dpi);
-        const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, null, false), px);
+        const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, null, false, fSudoku), px);
         const img = await pdfDoc.embedPng(png);
         placeImage(pg, box.rect, img);
-        if (doRelabel) drawLabelText(pg, lbl || defaultLabelPos(box), `${capCase(d,labelMode)} ${i+1}`, font);
+        if (doRelabel) drawLabelText(pg, lbl || defaultLabelPos(box), `${capCase(d,labelMode)} ${i+1}`, labelFont);
         bump(); $('detail').textContent=`Placing ${d} puzzle ${i+1}/${boxes.length}`;
         await new Promise(r=>setTimeout(r,0));
       }
@@ -586,17 +680,17 @@ async function buildBook(){
       const lbl = doRelabel ? findLabel(pageData, box) : null;
       if (lbl) lbl.items.forEach(it=>coverText(pg,it));
       const px  = Math.round(box.rect.w/72*dpi);
-      const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, res.solution, true), px);
+      const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, res.solution, true, fSudoku), px);
       const img = await pdfDoc.embedPng(png);
       placeImage(pg, box.rect, img);
-      if (doRelabel) drawLabelText(pg, lbl || defaultLabelPos(box), `${capCase(d,labelMode)} ${idx}`, font);
+      if (doRelabel) drawLabelText(pg, lbl || defaultLabelPos(box), `${capCase(d,labelMode)} ${idx}`, labelFont);
       bump(); $('detail').textContent=`Placing answer ${j+1}/${aboxes.length}`;
       await new Promise(r=>setTimeout(r,0));
     }
   }
 
   // 5) page numbers
-  if (doRenumber){ setStatus('Renumbering pages…'); stampPageNumbers(pages, font); }
+  if (doRenumber){ setStatus('Renumbering pages…'); stampPageNumbers(pages, pageFont); }
 
   // 6) save + download
   fill.style.width='98%'; setStatus('Saving PDF…');
@@ -645,12 +739,12 @@ async function handleFile(file){
   $('previews').innerHTML='';
   const buf = await file.arrayBuffer();
   masterBytes = new Uint8Array(buf);
-  if (!dinBytes) await loadDIN();
+  await ensureFont(FONTS[0]); // warm the default (DIN)
   pageCache = await renderAllPages(masterBytes);
   detect();
   renderPaletteUI();
   renderPlanUI();
-  ['panel-plan','panel-palette','panel-settings'].forEach(id=>$(id).classList.remove('hidden'));
+  ['panel-plan','panel-palette','panel-fonts','panel-settings'].forEach(id=>$(id).classList.remove('hidden'));
   $('bar-track').style.display='none';
   const totalPuz = DIFF_ORDER.reduce((s,d)=>s+buildPlan().puzzleBoxes[d].length,0);
   setStatus(`Analyzed ${analysis.numPages} pages — ${totalPuz} puzzle slots found. Review colors & settings, then build.`, 'ok');
@@ -663,6 +757,12 @@ drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('drag'); };
 drop.ondragleave=()=>drop.classList.remove('drag');
 drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); };
 $('btn-generate').onclick=()=>buildBook().catch(err=>{ setStatus('Error: '+err.message,'fail'); $('btn-generate').disabled=false; console.error(err); });
+
+// fonts
+$('btn-addfont').onclick = triggerAddFont;
+$('fontfile').onchange   = addFontFromFile;
+loadStoredFonts();
+populateFontSelects();
 </script>
 </body>
 </html>
