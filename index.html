@@ -78,6 +78,11 @@
   button#btn-download:hover { background: #1565c0; color: #fff; border-color: #90caf9; }
   button#btn-download:disabled { opacity: 0.35; cursor: default; }
 
+  button#btn-blank {
+    border-color: #546e7a; color: #78909c;
+  }
+  button#btn-blank:hover { background: #263238; color: #cfd8dc; border-color: #90a4ae; }
+
   /* ── Font dropdown ── */
   select#select-font {
     font-family: var(--ui-font);
@@ -348,6 +353,7 @@
   </div>
 
   <button id="btn-download" onclick="downloadSingle()" disabled>Download SVGs</button>
+  <button id="btn-blank" onclick="downloadBlankGrid()">Download Blank Grid</button>
 </div>
 
 <div id="status">Select a difficulty to generate a puzzle.</div>
@@ -917,6 +923,40 @@ function loadJSZip() {
     s.onerror = reject;
     document.head.appendChild(s);
   });
+}
+
+// ═══════════════════════════════════════════════════════
+// BLANK GRID DOWNLOAD
+// ═══════════════════════════════════════════════════════
+async function downloadBlankGrid() {
+  setStatus('Preparing blank grid…');
+  const JSZip = await loadJSZip();
+  const scale = getPngScale();
+  const zip   = new JSZip();
+
+  const f      = FONTS[fontIndex];
+  const srcUri = await fetchFontB64(f);
+  const styleBlock = `<defs><style>
+    @font-face { font-family: '${f.name}'; src: url('${srcUri}') format('truetype'); }
+  </style></defs>`;
+  const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540">
+${styleBlock}
+${GRID_SVG}
+</svg>`;
+
+  zip.file('blank_grid.svg', svgStr);
+  setStatus('Rendering PNG…');
+  zip.file('blank_grid.png', await svgToPng(svgStr, scale));
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: 'blank_grid.zip',
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus('Blank grid downloaded ✓', 'ok');
 }
 
 // ═══════════════════════════════════════════════════════
