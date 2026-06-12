@@ -581,6 +581,11 @@ const CLUE_RANGES = {
 const BALANCE_BY_DIFFICULTY = {
   easy: 1.0, medium: 0.8, hard: 0.55, extreme: 0.3, surreal: 0.12,
 };
+// Per-puzzle variety: how far a puzzle may drift looser than baseline and how
+// strong its clump/skew can get — keeps puzzles from all looking the same.
+const VARIETY_BY_DIFFICULTY = {
+  easy: 0.45, medium: 0.55, hard: 0.7, extreme: 0.8, surreal: 0.9,
+};
 const boxOf = (r, c) => (Math.floor(r / 3) * 3 + Math.floor(c / 3));
 
 // Retry generatePuzzle until the clue count lands within [min, max].
@@ -608,7 +613,20 @@ function generatePuzzle(difficulty) {
   const targetClues = minClues + Math.floor(Math.random() * (maxClues - minClues + 1));
   const puzzle = solution.map(r => [...r]);
 
-  const balance = BALANCE_BY_DIFFICULTY[difficulty] ?? 0.5;
+  // Per-puzzle "character": every other puzzle or so gets some flavour (looser
+  // + a directional clump) so no two play the same; the rest keep the tight
+  // baseline balance.
+  const base    = BALANCE_BY_DIFFICULTY[difficulty] ?? 0.5;
+  const variety = VARIETY_BY_DIFFICULTY[difficulty] ?? 0.6;
+  let   balance = base;
+  const boxBias = new Array(9).fill(0);
+  if (Math.random() < 0.5) {
+    balance = Math.max(0, base - Math.random() * variety);
+    const gx = Math.random() * 2 - 1, gy = Math.random() * 2 - 1;
+    const strength = (3 + Math.random() * 7) * variety;
+    for (let b = 0; b < 9; b++) boxBias[b] = ((b % 3 - 1) * gx + ((b / 3 | 0) - 1) * gy) * strength;
+    if (Math.random() < 0.4) boxBias[(Math.random() * 9) | 0] += strength;
+  }
   const noise = (1 - balance) * 18 + 0.3;
   const blocked = new Set();
   let current = 81;
@@ -624,7 +642,7 @@ function generatePuzzle(difficulty) {
 
     const scored = filled.map(p => {
       const r = (p / 9) | 0, c = p % 9;
-      return { p, s: 2.0 * boxCount[boxOf(r, c)] + 1.0 * digitCount[puzzle[r][c]] + Math.random() * noise };
+      return { p, s: 2.0 * boxCount[boxOf(r, c)] + 1.0 * digitCount[puzzle[r][c]] + boxBias[boxOf(r, c)] + Math.random() * noise };
     });
     scored.sort((a, b) => b.s - a.s);
 

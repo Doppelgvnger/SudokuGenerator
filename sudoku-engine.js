@@ -20,6 +20,14 @@ const BALANCE_BY_DIFFICULTY = {
   easy: 1.0, medium: 0.8, hard: 0.55, extreme: 0.3, surreal: 0.12,
 };
 
+// Per-puzzle variety: how far an individual puzzle may drift looser than its
+// baseline balance, and how strong its clump/skew can get. This is what keeps
+// puzzles from all looking the same — fun over flawless. Gentler on easy (stay
+// accessible), wilder on the hard end (more character).
+const VARIETY_BY_DIFFICULTY = {
+  easy: 0.45, medium: 0.55, hard: 0.7, extreme: 0.8, surreal: 0.9,
+};
+
 function newGrid() { return Array.from({ length: 9 }, () => new Array(9).fill(0)); }
 
 function isValid(grid, row, col, num) {
@@ -120,8 +128,23 @@ function generatePuzzle(difficulty, ranges = DEFAULT_CLUE_RANGES) {
   const targetClues = minClues + Math.floor(Math.random() * (maxClues - minClues + 1));
   const puzzle = solution.map(r => [...r]);
 
-  const balance = BALANCE_BY_DIFFICULTY[difficulty] ?? 0.5;
-  const noise = (1 - balance) * 18 + 0.3; // low balance ⇒ big random jitter
+  // ── Per-puzzle "character": every other puzzle or so, give it some flavour
+  //    so no two play the same (fun > flawless). The rest keep the tight
+  //    baseline balance, so a level stays recognisable. ──
+  const base    = BALANCE_BY_DIFFICULTY[difficulty] ?? 0.5;
+  const variety = VARIETY_BY_DIFFICULTY[difficulty] ?? 0.6;
+  let   balance = base;
+  const boxBias = new Array(9).fill(0);
+  if (Math.random() < 0.5) {
+    balance = Math.max(0, base - Math.random() * variety); // run looser than baseline
+    // directional clump: a gradient across the 3×3 box grid makes some regions
+    // denser and others sparser, in a random direction each time.
+    const gx = Math.random() * 2 - 1, gy = Math.random() * 2 - 1;
+    const strength = (3 + Math.random() * 7) * variety;
+    for (let b = 0; b < 9; b++) boxBias[b] = ((b % 3 - 1) * gx + ((b / 3 | 0) - 1) * gy) * strength;
+    if (Math.random() < 0.4) boxBias[(Math.random() * 9) | 0] += strength; // an extra sparse clump
+  }
+  const noise = (1 - balance) * 18 + 0.3;
   const blocked = new Set();
   let current = 81;
 
@@ -137,7 +160,7 @@ function generatePuzzle(difficulty, ranges = DEFAULT_CLUE_RANGES) {
     // score once, then sort (higher = remove sooner)
     const scored = filled.map(p => {
       const r = (p / 9) | 0, c = p % 9;
-      return { p, s: 2.0 * boxCount[boxOf(r, c)] + 1.0 * digitCount[puzzle[r][c]] + Math.random() * noise };
+      return { p, s: 2.0 * boxCount[boxOf(r, c)] + 1.0 * digitCount[puzzle[r][c]] + boxBias[boxOf(r, c)] + Math.random() * noise };
     });
     scored.sort((a, b) => b.s - a.s);
 
