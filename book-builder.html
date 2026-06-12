@@ -321,10 +321,12 @@ async function renderAllPages(bytes){
     const imgData = ctx.getImageData(0,0,cv.width,cv.height);
     cv.remove();
     const tc = await page.getTextContent();
-    const items = tc.items.filter(it=>it.str.trim()).map(it=>({
-      str: it.str, x: it.transform[4], y: it.transform[5],
-      w: it.width, fs: Math.hypot(it.transform[2], it.transform[3]),
-    }));
+    const items = tc.items.filter(it=>it.str.trim()).map(it=>{
+      const t = it.transform;                       // [a,b,c,d,e,f]
+      return { str: it.str, x:t[4], y:t[5], w:it.width,
+               fs: Math.hypot(t[2], t[3]),
+               angle: Math.atan2(t[1], t[0]) };      // 0 = horizontal, ~π/2 = vertical
+    });
     cache.push({ imgData, W:cv.width, H:cv.height, Wpt:vp1.width, Hpt:vp1.height, items });
     await new Promise(r=>setTimeout(r,0));
   }
@@ -524,6 +526,7 @@ function renderPaletteUI(){
 // ═══════════════════════════════════════════════════════
 const { rgb } = PDFLib;
 
+// Horizontal-text cover (page numbers).
 function coverText(pg, it){
   const asc=it.fs*0.82, desc=it.fs*0.30, pad=1.3;
   pg.drawRectangle({ x:it.x-pad, y:it.y-desc-pad, width:it.w+pad*2, height:asc+desc+pad*2, color:rgb(1,1,1) });
@@ -535,31 +538,71 @@ function placeImage(pg, rect, img){
   pg.drawImage(img, { x:rect.x, y:rect.y, width:rect.w, height:rect.h });
 }
 
-// Locate the existing label text just above a box (so we can cover + replace it).
-function findLabel(pageData, boxRef){
-  const topY = boxRef.rect.y + boxRef.rect.h;
-  const L = boxRef.rect.x, R = boxRef.rect.x + boxRef.rect.w;
-  const items = pageData.items.filter(it=>{
-    if (it.fs>14) return false;
-    const cx = it.x + it.w/2;
-    return it.y >= topY-3 && it.y <= topY+24 && cx >= L-25 && cx <= R+25;
-  });
-  if (!items.length) return null;
-  const minX=Math.min(...items.map(it=>it.x));
-  const maxX=Math.max(...items.map(it=>it.x+it.w));
-  return {
-    items,
-    baseY:   items.reduce((s,it)=>s+it.y,0)/items.length,
-    centerX: (minX+maxX)/2,
-    size:    Math.max(...items.map(it=>it.fs)),
+// ── Label replacement (orientation-aware) ──
+// Labels can be horizontal OR vertical (rotated 90°) and sit beside the box,
+// not just above it. We work in the item's own rotated frame.
+const LABEL_RE = /^(easy|medium|hard|extreme|surreal)\b/i;
+
+// Axis-aligned bounding box of a (possibly rotated) text item, in PDF points.
+function textBBox(it){
+  const a=it.angle, fs=it.fs, w=it.w, asc=fs*0.85, desc=fs*0.30;
+  const cos=Math.cos(a), sin=Math.sin(a);
+  const xs=[], ys=[];
+  for (const [lx,ly] of [[0,-desc],[w,-desc],[0,asc],[w,asc]]){
+    xs.push(it.x + lx*cos - ly*sin);
+    ys.push(it.y + lx*sin + ly*cos);
+  }
+  const minx=Math.min(...xs), miny=Math.min(...ys);
+  return { x:minx, y:miny, w:Math.max(...xs)-minx, h:Math.max(...ys)-miny };
+}
+function labelCenter(it){ const b=textBBox(it); return { x:b.x+b.w/2, y:b.y+b.h/2 }; }
+function coverItem(pg, it){
+  const b=textBBox(it), pad=1.4;
+  pg.drawRectangle({ x:b.x-pad, y:b.y-pad, width:b.w+2*pad, height:b.h+2*pad, color:rgb(1,1,1) });
+}
+
+// Find the box's label = the difficulty-word text nearest the box, preferring
+// the largest font (the prominent/decorative one), grouping any split runs.
+// `allRects` = every box rect on the page, used to claim a label for its
+// closest box so neighbouring boxes don't steal each other's labels.
+function findLabelGroup(pageData, boxRef, allRects){
+  const bx=boxRef.rect.x, by=boxRef.rect.y, bw=boxRef.rect.w, bh=boxRef.rect.h;
+  const M=50; // search margin around the box (points)
+  const owns = (c) => {
+    let best=Infinity, br=null;
+    for (const r of allRects){ const dx=c.x-(r.x+r.w/2), dy=c.y-(r.y+r.h/2), d=dx*dx+dy*dy; if(d<best){best=d;br=r;} }
+    return br && Math.abs(br.x-bx)<0.5 && Math.abs(br.y-by)<0.5;
   };
+  const cands = pageData.items.filter(it=>{
+    if (!LABEL_RE.test(it.str.trim())) return false;
+    const c = labelCenter(it);
+    if (!(c.x>=bx-M && c.x<=bx+bw+M && c.y>=by-M && c.y<=by+bh+M)) return false;
+    return owns(c);
+  });
+  if (!cands.length) return null;
+  const maxFs = Math.max(...cands.map(it=>it.fs));
+  return cands.filter(it=>it.fs >= maxFs-2); // the prominent label (+ its split runs)
 }
-function defaultLabelPos(boxRef){
-  return { items:[], baseY:boxRef.rect.y+boxRef.rect.h+4, centerX:boxRef.rect.x+boxRef.rect.w/2, size:10.8 };
-}
-function drawLabelText(pg, pos, text, font){
-  const tw = font.widthOfTextAtSize(text, pos.size);
-  pg.drawText(text, { x:pos.centerX-tw/2, y:pos.baseY, size:pos.size, font, color:rgb(0,0,0) });
+
+// Cover the old label group and draw `text` in its place, preserving size,
+// orientation and centre.
+function replaceLabelGroup(pg, items, text, font){
+  items.forEach(it=>coverItem(pg,it));
+  const size = Math.max(...items.map(it=>it.fs));
+  const deg  = Math.round(items[0].angle*180/Math.PI);
+  const newW = font.widthOfTextAtSize(text, size);
+  if (Math.abs(deg) < 1){ // horizontal — centre on the union of the runs
+    const minX=Math.min(...items.map(it=>it.x)), maxX=Math.max(...items.map(it=>it.x+it.w));
+    const baseY=items.reduce((s,it)=>s+it.y,0)/items.length;
+    pg.drawText(text, { x:(minX+maxX)/2 - newW/2, y:baseY, size, font, color:rgb(0,0,0) });
+  } else {                 // rotated — keep the same baseline, centre along reading dir
+    const it=items[0], a=items[0].angle;
+    pg.drawText(text, {
+      x: it.x + ((it.w-newW)/2)*Math.cos(a),
+      y: it.y + ((it.w-newW)/2)*Math.sin(a),
+      size, font, rotate: PDFLib.degrees(deg), color:rgb(0,0,0),
+    });
+  }
 }
 
 function stampPageNumbers(pages, font){
@@ -653,14 +696,15 @@ async function buildBook(){
         const box = boxes[i];
         const pg  = pages[box.page-1];
         const pageData = analysis.pages[box.page-1];
+        const allRects = pageData.boxes.map(b=>b.rect);
         // cover the old label FIRST, so the image then paints over any overlap
-        const lbl = doRelabel ? findLabel(pageData, box) : null;
-        if (lbl) lbl.items.forEach(it=>coverText(pg,it));
+        const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
+        if (lbl) lbl.forEach(it=>coverItem(pg,it));
         const px  = Math.round(box.rect.w/72*dpi);
         const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, null, false, fSudoku), px);
         const img = await pdfDoc.embedPng(png);
         placeImage(pg, box.rect, img);
-        if (doRelabel) drawLabelText(pg, lbl || defaultLabelPos(box), `${capCase(d,labelMode)} ${i+1}`, labelFont);
+        if (lbl) replaceLabelGroup(pg, lbl, `${capCase(d,labelMode)} ${i+1}`, labelFont);
         bump(); $('detail').textContent=`Placing ${d} puzzle ${i+1}/${boxes.length}`;
         await new Promise(r=>setTimeout(r,0));
       }
@@ -677,13 +721,14 @@ async function buildBook(){
       const box = aboxes[j];
       const pg  = pages[box.page-1];
       const pageData = analysis.pages[box.page-1];
-      const lbl = doRelabel ? findLabel(pageData, box) : null;
-      if (lbl) lbl.items.forEach(it=>coverText(pg,it));
+      const allRects = pageData.boxes.map(b=>b.rect);
+      const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
+      if (lbl) lbl.forEach(it=>coverItem(pg,it));
       const px  = Math.round(box.rect.w/72*dpi);
       const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, res.solution, true, fSudoku), px);
       const img = await pdfDoc.embedPng(png);
       placeImage(pg, box.rect, img);
-      if (doRelabel) drawLabelText(pg, lbl || defaultLabelPos(box), `${capCase(d,labelMode)} ${idx}`, labelFont);
+      if (lbl) replaceLabelGroup(pg, lbl, `${capCase(d,labelMode)} ${idx}`, labelFont);
       bump(); $('detail').textContent=`Placing answer ${j+1}/${aboxes.length}`;
       await new Promise(r=>setTimeout(r,0));
     }
