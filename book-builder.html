@@ -219,20 +219,12 @@ const DIFF_ORDER = ['easy','medium','hard','extreme','surreal'];
 const CLUE_RANGES = JSON.parse(JSON.stringify(DEFAULT_CLUE_RANGES));
 
 const CONFIG = {
-  colorTol:55,        // per-pixel gather tolerance: max RGB distance to treat a
-                      // pixel as a candidate of a palette color (kept modest so a
-                      // yellow box bleeding into a black splatter — olive, ~75 from
-                      // green — is never mistaken for green).
-  // ── STRICT recognition ──
-  strictColorTol:34,  // a detected region's MEAN color must be within this of the
-                      // exact palette color, else it's rejected (strict color).
-  strictFill:0.82,    // a region must fill ≥ this fraction of its bounding box to
-                      // count as a solid rectangle (strict rectangle).
-  maxAspect:2.6,      // reject slivers: bbox w/h (or h/w) beyond this isn't a box.
+  // Boxes are read straight from the PDF's vector content (filled rectangles),
+  // so recognition is inherently strict: a real rectangle of an exact fill color.
+  strictColorTol:38,  // STRICT color: a box's fill must be within this RGB distance of a palette color
   minBoxPt:55,        // min box side (points)
-  renderScale:1.0,    // page render scale for detection (1.0 ≈ 1px/pt; fast, and
-                      // box rects are dilated 2px anyway so the precision is plenty)
-  mergeGapPx:10,      // merge same-color fragments whose bboxes are within this gap
+  maxAspect:2.6,      // STRICT rectangle: reject non-box-shaped rects (w/h or h/w beyond this)
+  maxBoxFrac:0.6,     // reject rects larger than this fraction of the page (backgrounds)
 };
 
 let masterBytes = null;   // original PDF bytes for pdf-lib
@@ -350,127 +342,92 @@ function updateAllFontPreviews(){
 }
 
 // ═══════════════════════════════════════════════════════
-// PHASE 1 — render every page once, cache pixels + text
+// PHASE 1 — read each page's filled rectangles + live text (NO rasterizing)
 // ═══════════════════════════════════════════════════════
-async function renderAllPages(bytes){
+// Boxes come straight from the PDF's filled-rectangle ops. Some manuscripts use
+// heavy *vector* splatter art that takes minutes per page to rasterize but
+// parses in milliseconds — and reading the vector content gives exact rectangles
+// and exact source colors, which is strict by construction.
+function extractFilledRects(ol){
+  const OPS = pdfjsLib.OPS;
+  const clen = { [OPS.moveTo]:2,[OPS.lineTo]:2,[OPS.curveTo]:6,[OPS.curveTo2]:4,[OPS.curveTo3]:4,[OPS.closePath]:0,[OPS.rectangle]:4 };
+  const mul=(m,n)=>[m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]];
+  const app=(m,x,y)=>[m[0]*x+m[2]*y+m[4], m[1]*x+m[3]*y+m[5]];
+  let ctm=[1,0,0,1,0,0]; const stk=[]; let fill=null, pend=[]; const out=[];
+  for (let i=0;i<ol.fnArray.length;i++){
+    const fn=ol.fnArray[i], a=ol.argsArray[i];
+    if      (fn===OPS.save)            stk.push(ctm.slice());
+    else if (fn===OPS.restore)         ctm=stk.pop()||[1,0,0,1,0,0];
+    else if (fn===OPS.transform)       ctm=mul(ctm,a);
+    else if (fn===OPS.setFillRGBColor) fill=[a[0],a[1],a[2]];
+    else if (fn===OPS.constructPath){
+      const sub=a[0], co=a[1]; let ci=0;
+      for (const so of sub){
+        if (so===OPS.rectangle){
+          const x=co[ci],y=co[ci+1],w=co[ci+2],h=co[ci+3];
+          const c=[app(ctm,x,y),app(ctm,x+w,y),app(ctm,x,y+h),app(ctm,x+w,y+h)], xs=c.map(q=>q[0]), ys=c.map(q=>q[1]);
+          pend.push({ minx:Math.min(...xs), maxx:Math.max(...xs), miny:Math.min(...ys), maxy:Math.max(...ys), fill });
+        }
+        ci += clen[so]||0;
+      }
+    }
+    else if (fn===OPS.fill||fn===OPS.eoFill||fn===OPS.fillStroke||fn===OPS.eoFillStroke){ for (const r of pend) out.push(r); pend=[]; }
+    else if (fn===OPS.endPath) pend=[]; // path consumed for clipping, not a fill
+  }
+  return out;
+}
+
+async function analyzePages(bytes){
   const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
   const cache = [];
-  const S = CONFIG.renderScale;
   for (let p=1; p<=doc.numPages; p++){
     setStatus(`Reading page ${p} / ${doc.numPages}…`);
     const page = await doc.getPage(p);
-    const vp1  = page.getViewport({ scale:1 });
-    const vp   = page.getViewport({ scale:S });
-    const cv = document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
-    const ctx = cv.getContext('2d', { willReadFrequently:true });
-    await page.render({ canvasContext:ctx, viewport:vp }).promise;
-    const imgData = ctx.getImageData(0,0,cv.width,cv.height);
-    cv.remove();
+    const vp = page.getViewport({ scale:1 });
+    const rects = extractFilledRects(await page.getOperatorList());
     const tc = await page.getTextContent();
     const items = tc.items.filter(it=>it.str.trim()).map(it=>{
       const t = it.transform;                       // [a,b,c,d,e,f]
-      return { str: it.str, x:t[4], y:t[5], w:it.width,
-               fs: Math.hypot(t[2], t[3]),
-               angle: Math.atan2(t[1], t[0]) };      // 0 = horizontal, ~π/2 = vertical
+      return { str:it.str, x:t[4], y:t[5], w:it.width, fs:Math.hypot(t[2],t[3]), angle:Math.atan2(t[1],t[0]) };
     });
-    cache.push({ imgData, W:cv.width, H:cv.height, Wpt:vp1.width, Hpt:vp1.height, items });
-    await new Promise(r=>setTimeout(r,0));
+    cache.push({ Wpt:vp.width, Hpt:vp.height, items, rects });
+    if (p % 8 === 0) await new Promise(r=>setTimeout(r,0));
   }
   return cache;
 }
 
 // ═══════════════════════════════════════════════════════
-// PHASE 2 — detect boxes from cached pixels (fast; re-run on palette change)
+// PHASE 2 — classify cached rectangles against the palette (fast; re-runs on
+// every palette change). A rect becomes a box only if it is box-shaped and its
+// fill color matches a palette color within strictColorTol.
 // ═══════════════════════════════════════════════════════
+function overlapFrac(a,b){
+  const ix=Math.max(0, Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x));
+  const iy=Math.max(0, Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
+  return (ix*iy)/Math.max(1, Math.min(a.w*a.h, b.w*b.h));
+}
 function detectBoxesFromCache(pc){
-  const { imgData, W, H, Wpt, Hpt } = pc;
-  const data = imgData.data;
-  const S = CONFIG.renderScale;
+  const { rects, Wpt, Hpt } = pc;
   const pal = PALETTE.filter(c=>c.on).map(c=>({ ...c, rgb:hexToRgb(c.hex) }));
-  const maxD2 = CONFIG.colorTol * CONFIG.colorTol;
-  const lab = new Int16Array(W*H).fill(-1);
-  for (let i=0;i<W*H;i++){
-    const o=i*4, r=data[o], g=data[o+1], b=data[o+2], a=data[o+3];
-    if (a<128) continue;
-    if (r>=240 && g>=240 && b>=240) continue;   // white
-    if (r<=18 && g<=18 && b<=18) continue;       // black
-    let best=-1, bd=Infinity;
-    for (let k=0;k<pal.length;k++){
-      const pr=pal[k].rgb, dr=r-pr[0], dg=g-pr[1], db=b-pr[2], d=dr*dr+dg*dg+db*db;
-      if (d<bd){ bd=d; best=k; }
-    }
-    if (bd<=maxD2) lab[i]=best;
-  }
-  // ── connected components (track bbox, pixel area, and colour sums) ──
-  const seen = new Uint8Array(W*H);
-  const stack = new Int32Array(W*H);
-  let raw = [];
-  for (let i=0;i<W*H;i++){
-    if (seen[i] || lab[i]<0) continue;
-    const key = lab[i];
-    let minx=W, miny=H, maxx=0, maxy=0, n=0, rS=0, gS=0, bS=0, sp=0;
-    stack[sp++]=i; seen[i]=1;
-    while (sp){
-      const q=stack[--sp], x=q%W, y=(q/W)|0, o=q*4; n++;
-      rS+=data[o]; gS+=data[o+1]; bS+=data[o+2];
-      if (x<minx)minx=x; if (x>maxx)maxx=x; if (y<miny)miny=y; if (y>maxy)maxy=y;
-      if (x>0)   { const r=q-1; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
-      if (x<W-1) { const r=q+1; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
-      if (y>0)   { const r=q-W; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
-      if (y<H-1) { const r=q+W; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
-    }
-    raw.push({ key, minx, miny, maxx, maxy, n, rS, gS, bS });
-  }
-
-  // ── STRICT gate per component: must be a SOLID RECTANGLE of (near) the EXACT
-  //    palette colour. Rejects irregular blobs, thin anti-aliased edge-bands,
-  //    slivers, and regions whose averaged colour drifts off the target. ──
-  const isStrictBox = (c) => {
-    const bw=c.maxx-c.minx+1, bh=c.maxy-c.miny+1;
-    if (bw<=0 || bh<=0) return false;
-    if (c.n < CONFIG.strictFill * bw * bh) return false;                 // not solidly filled
-    const aspect = bw/bh;
-    if (aspect > CONFIG.maxAspect || aspect < 1/CONFIG.maxAspect) return false; // sliver
-    const pr = pal[c.key].rgb;
-    const dr=c.rS/c.n-pr[0], dg=c.gS/c.n-pr[1], db=c.bS/c.n-pr[2];
-    return (dr*dr + dg*dg + db*db) <= CONFIG.strictColorTol*CONFIG.strictColorTol; // mean colour matches
-  };
-  raw = raw.filter(isStrictBox);
-
-  // ── merge fragments of one box separated only by a thin gap ──
-  const G = CONFIG.mergeGapPx;
-  const parent = raw.map((_,i)=>i);
-  const find = a => { while(parent[a]!==a){ parent[a]=parent[parent[a]]; a=parent[a]; } return a; };
-  for (let a=0;a<raw.length;a++) for (let b=a+1;b<raw.length;b++){
-    if (raw[a].key!==raw[b].key) continue;
-    const xgap = Math.max(0, Math.max(raw[a].minx,raw[b].minx) - Math.min(raw[a].maxx,raw[b].maxx));
-    const ygap = Math.max(0, Math.max(raw[a].miny,raw[b].miny) - Math.min(raw[a].maxy,raw[b].maxy));
-    if (xgap<=G && ygap<=G) parent[find(a)] = find(b);
-  }
-  const merged = {};
-  for (let i=0;i<raw.length;i++){
-    const r=find(i), c=raw[i];
-    if (!merged[r]) merged[r] = { key:c.key, minx:c.minx, miny:c.miny, maxx:c.maxx, maxy:c.maxy, n:c.n, rS:c.rS, gS:c.gS, bS:c.bS };
-    else { const m=merged[r]; m.minx=Math.min(m.minx,c.minx); m.miny=Math.min(m.miny,c.miny); m.maxx=Math.max(m.maxx,c.maxx); m.maxy=Math.max(m.maxy,c.maxy); m.n+=c.n; m.rS+=c.rS; m.gS+=c.gS; m.bS+=c.bS; }
-  }
-
-  // ── keep merged boxes that are still a strict rectangle and big enough ──
-  const minPx = CONFIG.minBoxPt * S;
+  const tol2 = CONFIG.strictColorTol * CONFIG.strictColorTol;
+  const minPt = CONFIG.minBoxPt, pageArea = Wpt*Hpt;
   const boxes = [];
-  for (const k in merged){
-    const m = merged[k];
-    const bw=m.maxx-m.minx+1, bh=m.maxy-m.miny+1;
-    if (bw<minPx || bh<minPx) continue;
-    if (!isStrictBox(m)) continue;             // merged region must remain a solid rectangle
-    const c = pal[m.key];
-    // dilate 2px to recover the anti-aliased edge
-    const x0=Math.max(0,m.minx-2), y0=Math.max(0,m.miny-2), x1=Math.min(W-1,m.maxx+2), y1=Math.min(H-1,m.maxy+2);
-    boxes.push({
-      key:c.key, role:c.role,
-      rect:{ x:x0/S, y:Hpt-(y1+1)/S, w:(x1-x0+1)/S, h:(y1-y0+1)/S },
-    });
+  for (const r of rects){
+    if (!r.fill) continue;
+    const w=r.maxx-r.minx, h=r.maxy-r.miny;
+    if (w<minPt || h<minPt) continue;                                       // too small
+    const aspect=w/h; if (aspect>CONFIG.maxAspect || aspect<1/CONFIG.maxAspect) continue; // not box-shaped
+    if (w*h > pageArea*CONFIG.maxBoxFrac) continue;                         // page background, not a box
+    let best=-1, bd=Infinity;
+    for (let k=0;k<pal.length;k++){ const pr=pal[k].rgb, dr=r.fill[0]-pr[0], dg=r.fill[1]-pr[1], db=r.fill[2]-pr[2], d=dr*dr+dg*dg+db*db; if (d<bd){ bd=d; best=k; } }
+    if (best<0 || bd>tol2) continue;                                        // color off-palette
+    const c=pal[best];
+    boxes.push({ key:c.key, role:c.role, rect:{ x:r.minx, y:r.miny, w, h } });
   }
-  return boxes;
+  // drop duplicates (a slot's fill drawn twice / layered)
+  const kept=[];
+  for (const b of boxes) if (!kept.some(k=>k.key===b.key && overlapFrac(k.rect,b.rect)>0.7)) kept.push(b);
+  return kept;
 }
 
 function detect(){
@@ -840,7 +797,7 @@ async function handleFile(file){
   const buf = await file.arrayBuffer();
   masterBytes = new Uint8Array(buf);
   await ensureFont(FONTS[0]); // warm the default (DIN)
-  pageCache = await renderAllPages(masterBytes);
+  pageCache = await analyzePages(masterBytes);
   detect();
   renderPaletteUI();
   renderPlanUI();
