@@ -219,15 +219,20 @@ const DIFF_ORDER = ['easy','medium','hard','extreme','surreal'];
 const CLUE_RANGES = JSON.parse(JSON.stringify(DEFAULT_CLUE_RANGES));
 
 const CONFIG = {
-  colorTol:60,      // max RGB distance to count a pixel as a palette color.
-                    // Kept tight: a yellow box bleeding into a black splatter
-                    // passes through olive tones ~75 from green, so 60 avoids
-                    // misreading those edges as a different difficulty's color.
-  minBoxPt:55,      // min box side (points)
-  renderScale:1.0,  // page render scale for detection (1.0 ≈ 1px/pt; fast, and
-                    // box rects are dilated 2px anyway so the precision is plenty)
-  minFill:0.4,      // min (pixels / bbox-area): solid squares pass, thin AA edge-bands don't
-  mergeGapPx:14,    // merge same-color fragments whose bboxes are within this gap (splatter splits)
+  colorTol:55,        // per-pixel gather tolerance: max RGB distance to treat a
+                      // pixel as a candidate of a palette color (kept modest so a
+                      // yellow box bleeding into a black splatter — olive, ~75 from
+                      // green — is never mistaken for green).
+  // ── STRICT recognition ──
+  strictColorTol:34,  // a detected region's MEAN color must be within this of the
+                      // exact palette color, else it's rejected (strict color).
+  strictFill:0.82,    // a region must fill ≥ this fraction of its bounding box to
+                      // count as a solid rectangle (strict rectangle).
+  maxAspect:2.6,      // reject slivers: bbox w/h (or h/w) beyond this isn't a box.
+  minBoxPt:55,        // min box side (points)
+  renderScale:1.0,    // page render scale for detection (1.0 ≈ 1px/pt; fast, and
+                      // box rects are dilated 2px anyway so the precision is plenty)
+  mergeGapPx:10,      // merge same-color fragments whose bboxes are within this gap
 };
 
 let masterBytes = null;   // original PDF bytes for pdf-lib
@@ -396,36 +401,43 @@ function detectBoxesFromCache(pc){
     }
     if (bd<=maxD2) lab[i]=best;
   }
-  // ── connected components (track pixel area + bbox) ──
+  // ── connected components (track bbox, pixel area, and colour sums) ──
   const seen = new Uint8Array(W*H);
   const stack = new Int32Array(W*H);
   let raw = [];
   for (let i=0;i<W*H;i++){
     if (seen[i] || lab[i]<0) continue;
     const key = lab[i];
-    let minx=W, miny=H, maxx=0, maxy=0, n=0, sp=0;
+    let minx=W, miny=H, maxx=0, maxy=0, n=0, rS=0, gS=0, bS=0, sp=0;
     stack[sp++]=i; seen[i]=1;
     while (sp){
-      const q=stack[--sp], x=q%W, y=(q/W)|0; n++;
+      const q=stack[--sp], x=q%W, y=(q/W)|0, o=q*4; n++;
+      rS+=data[o]; gS+=data[o+1]; bS+=data[o+2];
       if (x<minx)minx=x; if (x>maxx)maxx=x; if (y<miny)miny=y; if (y>maxy)maxy=y;
       if (x>0)   { const r=q-1; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
       if (x<W-1) { const r=q+1; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
       if (y>0)   { const r=q-W; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
       if (y<H-1) { const r=q+W; if(!seen[r]&&lab[r]===key){seen[r]=1;stack[sp++]=r;} }
     }
-    raw.push({ key, minx, miny, maxx, maxy, n });
+    raw.push({ key, minx, miny, maxx, maxy, n, rS, gS, bS });
   }
 
-  // ── drop thin / sparse blobs: a real placeholder is a SOLID square, so its
-  //    pixel count fills most of its bounding box. Anti-aliased edge-bands
-  //    (e.g. a yellow box bleeding into a black splatter, which can read as
-  //    green) trace a thin curve with a very low fill ratio — reject those. ──
-  raw = raw.filter(c => {
+  // ── STRICT gate per component: must be a SOLID RECTANGLE of (near) the EXACT
+  //    palette colour. Rejects irregular blobs, thin anti-aliased edge-bands,
+  //    slivers, and regions whose averaged colour drifts off the target. ──
+  const isStrictBox = (c) => {
     const bw=c.maxx-c.minx+1, bh=c.maxy-c.miny+1;
-    return c.n >= CONFIG.minFill * bw * bh;
-  });
+    if (bw<=0 || bh<=0) return false;
+    if (c.n < CONFIG.strictFill * bw * bh) return false;                 // not solidly filled
+    const aspect = bw/bh;
+    if (aspect > CONFIG.maxAspect || aspect < 1/CONFIG.maxAspect) return false; // sliver
+    const pr = pal[c.key].rgb;
+    const dr=c.rS/c.n-pr[0], dg=c.gS/c.n-pr[1], db=c.bS/c.n-pr[2];
+    return (dr*dr + dg*dg + db*db) <= CONFIG.strictColorTol*CONFIG.strictColorTol; // mean colour matches
+  };
+  raw = raw.filter(isStrictBox);
 
-  // ── merge fragments of one box split by an overlapping splatter ──
+  // ── merge fragments of one box separated only by a thin gap ──
   const G = CONFIG.mergeGapPx;
   const parent = raw.map((_,i)=>i);
   const find = a => { while(parent[a]!==a){ parent[a]=parent[parent[a]]; a=parent[a]; } return a; };
@@ -438,17 +450,18 @@ function detectBoxesFromCache(pc){
   const merged = {};
   for (let i=0;i<raw.length;i++){
     const r=find(i), c=raw[i];
-    if (!merged[r]) merged[r] = { key:c.key, minx:c.minx, miny:c.miny, maxx:c.maxx, maxy:c.maxy };
-    else { const m=merged[r]; m.minx=Math.min(m.minx,c.minx); m.miny=Math.min(m.miny,c.miny); m.maxx=Math.max(m.maxx,c.maxx); m.maxy=Math.max(m.maxy,c.maxy); }
+    if (!merged[r]) merged[r] = { key:c.key, minx:c.minx, miny:c.miny, maxx:c.maxx, maxy:c.maxy, n:c.n, rS:c.rS, gS:c.gS, bS:c.bS };
+    else { const m=merged[r]; m.minx=Math.min(m.minx,c.minx); m.miny=Math.min(m.miny,c.miny); m.maxx=Math.max(m.maxx,c.maxx); m.maxy=Math.max(m.maxy,c.maxy); m.n+=c.n; m.rS+=c.rS; m.gS+=c.gS; m.bS+=c.bS; }
   }
 
-  // ── keep boxes of plausible size; convert to PDF points (bottom-left) ──
+  // ── keep merged boxes that are still a strict rectangle and big enough ──
   const minPx = CONFIG.minBoxPt * S;
   const boxes = [];
   for (const k in merged){
     const m = merged[k];
     const bw=m.maxx-m.minx+1, bh=m.maxy-m.miny+1;
     if (bw<minPx || bh<minPx) continue;
+    if (!isStrictBox(m)) continue;             // merged region must remain a solid rectangle
     const c = pal[m.key];
     // dilate 2px to recover the anti-aliased edge
     const x0=Math.max(0,m.minx-2), y0=Math.max(0,m.miny-2), x1=Math.min(W-1,m.maxx+2), y1=Math.min(H-1,m.maxy+2);
