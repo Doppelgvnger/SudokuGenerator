@@ -66,6 +66,10 @@
   .field label { font-size:0.74rem; letter-spacing:0.08em; color:#777; text-transform:uppercase; }
   .field .row { display:flex; align-items:center; gap:8px; }
   select { font-family:var(--ui-font); font-size:0.9rem; padding:6px 9px; border:1px solid #333; background:#111; color:#ddd; outline:none; }
+  .font-preview {
+    margin-top:6px; padding:7px 10px; border:1px solid #2a2a2a; background:#fff; color:#0a0a0a;
+    font-size:1.45rem; line-height:1.1; letter-spacing:0.06em; min-height:2rem; border-radius:2px; overflow:hidden; white-space:nowrap;
+  }
   .check { display:flex; align-items:center; gap:8px; font-size:0.88rem; color:#bbb; cursor:pointer; }
   .check input { width:16px; height:16px; }
 
@@ -117,14 +121,17 @@
     <div class="field">
       <label>Sudoku numbers</label>
       <div class="row"><select id="font-sudoku" style="flex:1"></select></div>
+      <div class="font-preview" id="fp-sudoku">5 3 7 1 9 2 4 6 8 0</div>
     </div>
     <div class="field">
       <label>Puzzle labels (e.g. “Easy 1”)</label>
       <div class="row"><select id="font-label" style="flex:1"></select></div>
+      <div class="font-preview" id="fp-label">Easy 1</div>
     </div>
     <div class="field">
       <label>Page numbers</label>
       <div class="row"><select id="font-page" style="flex:1"></select></div>
+      <div class="font-preview" id="fp-page">1 2 3</div>
     </div>
     <div class="field">
       <label>Add your own font</label>
@@ -186,6 +193,7 @@
 <div id="bar-track"><div id="bar-fill"></div></div>
 <div id="detail"></div>
 <div id="status">Waiting for a PDF…</div>
+<button id="btn-download-again" class="hidden" style="border-color:#4caf50;color:#4caf50;">⬇ Download PDF</button>
 
 <div id="previews"></div>
 
@@ -225,6 +233,7 @@ const CONFIG = {
 let masterBytes = null;   // original PDF bytes for pdf-lib
 let pageCache  = null;    // [{imgData, W, H, Wpt, Hpt, items}]
 let analysis   = null;    // detection result
+let lastOutput = null;    // { blob, name } of the most recent built PDF (for re-download)
 
 // ── Font registry, shared by the 3 pickers (sudoku numbers / labels / page
 //    numbers). Each font carries a base64 dataUri (for the canvas-rendered
@@ -243,6 +252,12 @@ const $ = id => document.getElementById(id);
 function setStatus(msg, cls='') { const e=$('status'); e.textContent=msg; e.className=cls; }
 function hexToRgb(h){ const n=parseInt(h.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
 function capCase(s, mode){ if(mode==='upper')return s.toUpperCase(); if(mode==='lower')return s.toLowerCase(); return s.charAt(0).toUpperCase()+s.slice(1); }
+function downloadBlob(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href:url, download:name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 15000);
+}
 
 // ═══════════════════════════════════════════════════════
 // FONTS
@@ -298,9 +313,35 @@ function addFontFromFile(ev){
     FONTS.push({ name, dataUri:e.target.result });
     saveStoredFonts();
     populateFontSelects();
+    updateAllFontPreviews();
     setStatus(`Added font “${name}”. Choose it in the font menus.`, 'ok');
   };
   reader.readAsDataURL(file);
+}
+
+// ── Live font previews (register a private @font-face per font, on demand) ──
+let _faceSeq = 0;
+function registerFontFace(f){
+  if (f.previewFamily) return f.previewFamily;
+  const fam = 'bbf-' + (_faceSeq++);
+  const style = document.createElement('style');
+  style.textContent = `@font-face{font-family:'${fam}';src:url('${f.dataUri}') format('truetype');}`;
+  document.head.appendChild(style);
+  f.previewFamily = fam;
+  return fam;
+}
+async function updateFontPreview(selId, previewId){
+  const f = FONTS[parseInt($(selId).value,10)] || FONTS[0];
+  const el = $(previewId); if (!el) return;
+  try {
+    await ensureFont(f);
+    el.style.fontFamily = `'${registerFontFace(f)}', sans-serif`;
+  } catch(e){ el.style.fontFamily = 'sans-serif'; }
+}
+function updateAllFontPreviews(){
+  updateFontPreview('font-sudoku','fp-sudoku');
+  updateFontPreview('font-label','fp-label');
+  updateFontPreview('font-page','fp-page');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -737,16 +778,17 @@ async function buildBook(){
   // 5) page numbers
   if (doRenumber){ setStatus('Renumbering pages…'); stampPageNumbers(pages, pageFont); }
 
-  // 6) save + download
+  // 6) save + download. Keep the blob so the user can re-download if the
+  //    browser's initial download prompt was dismissed/blocked.
   fill.style.width='98%'; setStatus('Saving PDF…');
   const out = await pdfDoc.save();
-  const blob = new Blob([out], { type:'application/pdf' });
-  const a = Object.assign(document.createElement('a'), { href:URL.createObjectURL(blob), download:'sudoku_book_filled.pdf' });
-  a.click(); URL.revokeObjectURL(a.href);
+  lastOutput = { blob: new Blob([out], { type:'application/pdf' }), name:'sudoku_book_filled.pdf' };
+  downloadBlob(lastOutput.blob, lastOutput.name);
+  $('btn-download-again').classList.remove('hidden');
 
   fill.style.width='100%';
   const warn = rangeMisses ? `  (⚠ ${rangeMisses} puzzle${rangeMisses===1?'':'s'} fell outside the dialed clue range)` : '';
-  setStatus(`Done — ${made} puzzles placed, PDF downloaded ✓${warn}`, rangeMisses?'warn':'ok');
+  setStatus(`Done — ${made} puzzles placed ✓${warn} — use the Download button below if the file didn't save.`, rangeMisses?'warn':'ok');
   $('detail').textContent='';
   $('btn-generate').disabled=false;
 
@@ -802,12 +844,16 @@ drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('drag'); };
 drop.ondragleave=()=>drop.classList.remove('drag');
 drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); };
 $('btn-generate').onclick=()=>buildBook().catch(err=>{ setStatus('Error: '+err.message,'fail'); $('btn-generate').disabled=false; console.error(err); });
+$('btn-download-again').onclick=()=>{ if (lastOutput) downloadBlob(lastOutput.blob, lastOutput.name); };
 
 // fonts
 $('btn-addfont').onclick = triggerAddFont;
 $('fontfile').onchange   = addFontFromFile;
+for (const [sid,pid] of [['font-sudoku','fp-sudoku'],['font-label','fp-label'],['font-page','fp-page']])
+  $(sid).onchange = () => updateFontPreview(sid, pid);
 loadStoredFonts();
 populateFontSelects();
+updateAllFontPreviews();
 </script>
 </body>
 </html>

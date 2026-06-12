@@ -147,14 +147,11 @@ const GRID_SVG = `
   <line x1="420" y1="0" x2="420" y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
   <line x1="0" y1="480" x2="540" y2="480" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
   <line x1="480" y1="0" x2="480" y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
-  <line x1="0" y1="0"   x2="540" y2="0"   stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-  <line x1="0" y1="0"   x2="0"   y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="0" y1="180" x2="540" y2="180" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="180" y1="0" x2="180" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="0" y1="360" x2="540" y2="360" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="360" y1="0" x2="360" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-  <line x1="0" y1="540" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-  <line x1="540" y1="0" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <rect x="2" y="2" width="536" height="536" fill="none" stroke="#0a0a0a" stroke-width="4.0" stroke-linejoin="miter"/>
 `;
 
 function cellX(col) { return 30 + col * 60; }
