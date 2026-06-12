@@ -206,14 +206,14 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// ── Palette (defaults sampled from the example manuscript) ──
+// ── Palette (exact Canva placeholder colors) ──
 const PALETTE = [
-  { key:'easy',    name:'Easy',    hex:'#7BC96B', role:'puzzle', on:true  },
-  { key:'medium',  name:'Medium',  hex:'#FFEC64', role:'puzzle', on:true  },
-  { key:'hard',    name:'Hard',    hex:'#FF371F', role:'puzzle', on:true  },
-  { key:'extreme', name:'Extreme', hex:'#FF8C00', role:'puzzle', on:true  },
-  { key:'surreal', name:'Surreal', hex:'#9C27B0', role:'puzzle', on:true  },
-  { key:'answer',  name:'Answers', hex:'#08419E', role:'answer', on:true  },
+  { key:'easy',    name:'Easy',    hex:'#7ED957', role:'puzzle', on:true  }, // green
+  { key:'medium',  name:'Medium',  hex:'#FFDE59', role:'puzzle', on:true  }, // yellow
+  { key:'hard',    name:'Hard',    hex:'#FF3131', role:'puzzle', on:true  }, // red
+  { key:'extreme', name:'Extreme', hex:'#FF751F', role:'puzzle', on:true  }, // orange
+  { key:'surreal', name:'Surreal', hex:'#CB6CE6', role:'puzzle', on:true  }, // purple
+  { key:'answer',  name:'Answers', hex:'#1800AD', role:'answer', on:true  }, // blue
 ];
 const DIFF_ORDER = ['easy','medium','hard','extreme','surreal'];
 const CLUE_RANGES = JSON.parse(JSON.stringify(DEFAULT_CLUE_RANGES));
