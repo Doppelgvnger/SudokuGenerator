@@ -575,6 +575,14 @@ const CLUE_RANGES = {
   surreal: [23, 25],
 };
 
+// How strongly clue removal keeps the puzzle balanced (1 = strictly even clues
+// across boxes & digits, 0 = fully random). Easier levels stay very balanced
+// for accessibility; harder levels stay loose to keep their character.
+const BALANCE_BY_DIFFICULTY = {
+  easy: 1.0, medium: 0.8, hard: 0.55, extreme: 0.3, surreal: 0.12,
+};
+const boxOf = (r, c) => (Math.floor(r / 3) * 3 + Math.floor(c / 3));
+
 // Retry generatePuzzle until the clue count lands within [min, max].
 // Returns null if it can't hit the range after maxAttempts tries.
 function generatePuzzleInRange(difficulty, maxAttempts = 30) {
@@ -587,26 +595,48 @@ function generatePuzzleInRange(difficulty, maxAttempts = 30) {
   return null; // range unreachable — caller should report error
 }
 
+// Deliberate, balanced clue removal: each step removes the clue that most
+// evens out the puzzle — cells in the fullest 3×3 box holding the most
+// over-represented digit go first — so no box is left bare while another stays
+// packed, and digits 1–9 stay evenly distributed. `balance` scales how much
+// this matters vs. randomness. A cell whose removal breaks uniqueness is
+// "blocked" and never re-tested (it can't become removable as clues thin out).
 function generatePuzzle(difficulty) {
   const solution = newGrid();
   fillGrid(solution);
   const [minClues, maxClues] = CLUE_RANGES[difficulty];
   const targetClues = minClues + Math.floor(Math.random() * (maxClues - minClues + 1));
   const puzzle = solution.map(r => [...r]);
-  const maxPasses = difficulty === 'surreal' ? 6 : difficulty === 'extreme' ? 3 : 2;
-  for (let pass = 0; pass < maxPasses; pass++) {
+
+  const balance = BALANCE_BY_DIFFICULTY[difficulty] ?? 0.5;
+  const noise = (1 - balance) * 18 + 0.3;
+  const blocked = new Set();
+  let current = 81;
+
+  while (current > targetClues) {
+    const boxCount = new Array(9).fill(0), digitCount = new Array(10).fill(0);
     const filled = [];
-    for (let i = 0; i < 81; i++)
-      if (puzzle[Math.floor(i/9)][i%9] !== 0) filled.push(i);
-    if (filled.length <= targetClues) break;
-    shuffle(filled);
-    for (const pos of filled) {
-      if (puzzle.flat().filter(v => v !== 0).length <= targetClues) break;
-      const r = Math.floor(pos/9), c = pos%9;
-      const backup = puzzle[r][c];
-      puzzle[r][c] = 0;
-      if (countSolutions(puzzle.map(row=>[...row]), 2) !== 1) puzzle[r][c] = backup;
+    for (let i = 0; i < 81; i++) {
+      const r = (i / 9) | 0, c = i % 9, v = puzzle[r][c];
+      if (v !== 0) { boxCount[boxOf(r, c)]++; digitCount[v]++; if (!blocked.has(i)) filled.push(i); }
     }
+    if (!filled.length) break;
+
+    const scored = filled.map(p => {
+      const r = (p / 9) | 0, c = p % 9;
+      return { p, s: 2.0 * boxCount[boxOf(r, c)] + 1.0 * digitCount[puzzle[r][c]] + Math.random() * noise };
+    });
+    scored.sort((a, b) => b.s - a.s);
+
+    let removed = false;
+    for (const { p } of scored) {
+      const r = (p / 9) | 0, c = p % 9, backup = puzzle[r][c];
+      puzzle[r][c] = 0;
+      if (countSolutions(puzzle.map(row => [...row]), 2) === 1) { current--; removed = true; break; }
+      puzzle[r][c] = backup;
+      blocked.add(p);
+    }
+    if (!removed) break;
   }
   return { puzzle, solution };
 }
