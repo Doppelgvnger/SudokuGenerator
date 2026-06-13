@@ -84,7 +84,7 @@
   button#btn-blank:hover { background: #263238; color: #cfd8dc; border-color: #90a4ae; }
 
   /* ── Font dropdown ── */
-  select#select-font {
+  select#select-font, select#select-outline {
     font-family: var(--ui-font);
     font-size: 1rem;
     letter-spacing: 0.08em;
@@ -101,8 +101,8 @@
     background-position: right 12px center;
     padding-right: 36px;
   }
-  select#select-font:hover { border-color: #90a4ae; color: #cfd8dc; }
-  select#select-font option { background: #1a1a1a; color: #ccc; }
+  select#select-font:hover, select#select-outline:hover { border-color: #90a4ae; color: #cfd8dc; }
+  select#select-font option, select#select-outline option { background: #1a1a1a; color: #ccc; }
 
   /* ── Font manager row ── */
   .font-row {
@@ -343,6 +343,11 @@
   <button id="btn-extreme" onclick="generate('extreme')">Extreme</button>
   <button id="btn-surreal" onclick="generate('surreal')">Surreal</button>
 
+  <select id="select-outline" onchange="changeOutline()" title="Grid outline style">
+    <option value="bold">Outline: Bold</option>
+    <option value="thin">Outline: Thin</option>
+  </select>
+
   <div class="font-row">
     <select id="select-font" onchange="changeFont()">
       <option value="0">Font: DIN</option>
@@ -457,7 +462,8 @@
 // Grid: 9×9 cells of 60px = 540×540. Origin at (0,0). No margins.
 // Thin cell lines: 60,120 | 240,300 | 420,480
 // Thick box lines: 0,180,360,540
-const GRID_SVG = `
+// Inner grid (every style): white bg, thin cell lines (1.5), thick 3×3 dividers (4).
+const GRID_INNER = `
   <rect x="0" y="0" width="540" height="540" fill="#ffffff"/>
   <line x1="0" y1="60"  x2="540" y2="60"  stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
   <line x1="60"  y1="0" x2="60"  y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
@@ -475,8 +481,18 @@ const GRID_SVG = `
   <line x1="180" y1="0" x2="180" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="0" y1="360" x2="540" y2="360" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="360" y1="0" x2="360" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-  <rect x="2" y="2" width="536" height="536" fill="none" stroke="#0a0a0a" stroke-width="4.0" stroke-linejoin="miter"/>
 `;
+// Outer frame: 'bold' = full 4px (inset rect, matches inner dividers);
+// 'thin' = classic edge lines that render ~2px (half clipped by the viewBox).
+const GRID_OUTER_BOLD = `<rect x="2" y="2" width="536" height="536" fill="none" stroke="#0a0a0a" stroke-width="4.0" stroke-linejoin="miter"/>`;
+const GRID_OUTER_THIN = `
+  <line x1="0" y1="0"   x2="540" y2="0"   stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="0" y1="0"   x2="0"   y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="0" y1="540" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="540" y1="0" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+`;
+let outlineStyle = 'bold';
+function gridMarkup() { return GRID_INNER + (outlineStyle === 'thin' ? GRID_OUTER_THIN : GRID_OUTER_BOLD); }
 
 // Cell centre: x = 30 + col*60,  y = 30 + row*60
 function cellX(col) { return 30 + col * 60; }
@@ -711,6 +727,14 @@ function changeFont() {
   document.getElementById('btn-remove-font').disabled = idx < BUILTIN_FONT_COUNT;
 }
 
+function changeOutline() {
+  outlineStyle = document.getElementById('select-outline').value;
+  if (state.puzzle) {
+    renderToSVGElement(document.getElementById('svg-puzzle'),   state.puzzle, state.solution, false);
+    renderToSVGElement(document.getElementById('svg-solution'), state.puzzle, state.solution, true);
+  }
+}
+
 // ─── Font manager ──────────────────────────────────────
 const BUILTIN_FONT_COUNT = FONTS.length; // set once, never changes
 const CUSTOM_FONTS_KEY   = 'sudoku_custom_fonts';
@@ -847,13 +871,13 @@ async function buildStandaloneSVG(puzzle, solution, showSolution) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540">
 ${styleBlock}
-${GRID_SVG}
+${gridMarkup()}
 ${texts}
 </svg>`;
 }
 
 function renderToSVGElement(svgEl, puzzle, solution, showSolution) {
-  svgEl.innerHTML = GRID_SVG + buildSVGContent(puzzle, solution, showSolution);
+  svgEl.innerHTML = gridMarkup() + buildSVGContent(puzzle, solution, showSolution);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -989,7 +1013,7 @@ async function downloadBlankGrid() {
   const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540">
 ${styleBlock}
-${GRID_SVG}
+${gridMarkup()}
 </svg>`;
 
   zip.file('blank_grid.svg', svgStr);

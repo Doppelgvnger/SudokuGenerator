@@ -169,6 +169,15 @@
       </div>
     </div>
     <div class="field">
+      <label>Grid outline</label>
+      <div class="row">
+        <select id="grid-outline">
+          <option value="bold" selected>Bold (thick border)</option>
+          <option value="thin">Thin (classic)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
       <label>Page numbering starts at PDF page</label>
       <div class="row"><input type="number" id="startPage" value="1" min="1" style="width:70px"></div>
     </div>
@@ -213,7 +222,7 @@ const PALETTE = [
   { key:'hard',    name:'Hard',    hex:'#FF3131', role:'puzzle', on:true  }, // red
   { key:'extreme', name:'Extreme', hex:'#FF751F', role:'puzzle', on:true  }, // orange
   { key:'surreal', name:'Surreal', hex:'#CB6CE6', role:'puzzle', on:true  }, // purple
-  { key:'answer',  name:'Answers', hex:'#1800AD', role:'answer', on:true  }, // blue
+  { key:'answer',  name:'Answers', hex:'#0B2F7D', role:'answer', on:true  }, // blue
 ];
 const DIFF_ORDER = ['easy','medium','hard','extreme','surreal'];
 const CLUE_RANGES = JSON.parse(JSON.stringify(DEFAULT_CLUE_RANGES));
@@ -639,6 +648,7 @@ function renderSudokuSVG(puzzle, solution, showSolution, f){
   return buildSudokuSVGString({
     puzzle, solution, showSolution,
     fontName:f.name, fontFamily:`'${f.name}', sans-serif`, dataUri:f.dataUri, fontSize:38,
+    outline: $('grid-outline').value,
   });
 }
 

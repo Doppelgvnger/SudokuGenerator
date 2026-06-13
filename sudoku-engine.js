@@ -192,7 +192,8 @@ function generatePuzzleInRange(difficulty, ranges = DEFAULT_CLUE_RANGES, maxAtte
 // SVG RENDERING
 // ═══════════════════════════════════════════════════════
 // 9×9 cells of 60px = 540×540, origin (0,0), full bleed.
-const GRID_SVG = `
+// Inner grid (same for every style): white bg, thin cell lines, thick 3×3 dividers.
+const GRID_INNER = `
   <rect x="0" y="0" width="540" height="540" fill="#ffffff"/>
   <line x1="0" y1="60"  x2="540" y2="60"  stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
   <line x1="60"  y1="0" x2="60"  y2="540" stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
@@ -210,8 +211,21 @@ const GRID_SVG = `
   <line x1="180" y1="0" x2="180" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="0" y1="360" x2="540" y2="360" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="360" y1="0" x2="360" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-  <rect x="2" y="2" width="536" height="536" fill="none" stroke="#0a0a0a" stroke-width="4.0" stroke-linejoin="miter"/>
 `;
+// Outer frame styles:
+//  'bold'  → inset rect drawn fully inside the viewBox, so the border shows its
+//            full 4px (matches the inner 3×3 dividers).
+//  'thin'  → classic edge lines centred on the viewBox edge; half the 4px stroke
+//            is clipped off, so the border reads ~2px (the old look).
+const GRID_OUTER_BOLD = `<rect x="2" y="2" width="536" height="536" fill="none" stroke="#0a0a0a" stroke-width="4.0" stroke-linejoin="miter"/>`;
+const GRID_OUTER_THIN = `
+  <line x1="0" y1="0"   x2="540" y2="0"   stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="0" y1="0"   x2="0"   y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="0" y1="540" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+  <line x1="540" y1="0" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
+`;
+function gridMarkup(outline) { return GRID_INNER + (outline === 'thin' ? GRID_OUTER_THIN : GRID_OUTER_BOLD); }
+const GRID_SVG = gridMarkup('bold'); // back-compat default
 
 function cellX(col) { return 30 + col * 60; }
 function cellY(row) { return 30 + row * 60; }
@@ -233,7 +247,7 @@ function buildSVGContent(puzzle, solution, showSolution) {
 }
 
 // Self-contained SVG string with embedded font (for canvas→PNG rendering).
-function buildSudokuSVGString({ puzzle, solution, showSolution, fontName, fontFamily, dataUri, fontSize = 38 }) {
+function buildSudokuSVGString({ puzzle, solution, showSolution, fontName, fontFamily, dataUri, fontSize = 38, outline = 'bold' }) {
   const faceBlock = dataUri
     ? `@font-face { font-family: '${fontName}'; src: url('${dataUri}') format('truetype'); }`
     : '';
@@ -245,7 +259,7 @@ function buildSudokuSVGString({ puzzle, solution, showSolution, fontName, fontFa
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540">
 ${styleBlock}
-${GRID_SVG}
+${gridMarkup(outline)}
 ${buildSVGContent(puzzle, solution, showSolution)}
 </svg>`;
 }
