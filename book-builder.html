@@ -48,7 +48,8 @@
 
   .palette-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .palette-row input[type=color] { width:34px; height:30px; border:1px solid #333; background:#111; padding:0; cursor:pointer; }
-  .palette-row .pname { width:90px; font-size:0.9rem; letter-spacing:0.05em; }
+  .palette-row input.pname { width:104px; font-size:0.9rem; letter-spacing:0.04em; padding:6px 8px; border:1px solid #333; background:#111; color:#ddd; outline:none; }
+  .palette-row input.pname:focus { border-color:#607d8b; }
   .palette-row input[type=text].hex { width:84px; }
   .palette-row .count { font-size:0.78rem; color:#888; margin-left:auto; }
   .palette-row.off { opacity:0.4; }
@@ -258,6 +259,7 @@ const $ = id => document.getElementById(id);
 function setStatus(msg, cls='') { const e=$('status'); e.textContent=msg; e.className=cls; }
 function hexToRgb(h){ const n=parseInt(h.replace('#',''),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
 function capCase(s, mode){ if(mode==='upper')return s.toUpperCase(); if(mode==='lower')return s.toLowerCase(); return s.charAt(0).toUpperCase()+s.slice(1); }
+const palName = k => { const c = PALETTE.find(p=>p.key===k); return (c && c.name) ? c.name : k; }; // user-editable difficulty label
 function downloadBlob(blob, name){
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), { href:url, download:name });
@@ -470,6 +472,7 @@ function buildPlan(){
 // UI rendering of plan + palette
 // ═══════════════════════════════════════════════════════
 function renderPlanUI(){
+  if (!analysis) return; // nothing to count until a PDF is analyzed
   const plan = buildPlan();
   const totalPuz = DIFF_ORDER.reduce((s,d)=>s+plan.puzzleBoxes[d].length,0);
   const totalAns = plan.answerBoxes.length;
@@ -482,12 +485,12 @@ function renderPlanUI(){
     const c = PALETTE.find(p=>p.key===d);
     if (!c.on) continue;
     const n = plan.puzzleBoxes[d].length;
-    rows += `<tr><td style="text-transform:capitalize">${d}</td>`
+    rows += `<tr><td>${c.name}</td>`
          +  `<td><span class="swatch" style="background:${c.hex}"></span></td>`
          +  `<td>${n}</td></tr>`;
   }
   const ans = PALETTE.find(p=>p.key==='answer');
-  rows += `<tr><td>Answers</td><td><span class="swatch" style="background:${ans.hex}"></span></td><td>${totalAns}</td></tr>`;
+  rows += `<tr><td>${ans.name}</td><td><span class="swatch" style="background:${ans.hex}"></span></td><td>${totalAns}</td></tr>`;
   $('plan-table').innerHTML = rows;
 
   const mm = $('mismatch');
@@ -519,7 +522,7 @@ function renderPaletteUI(){
       `<input type="checkbox" ${c.on?'checked':''} title="use this difficulty">`+
       `<input type="color" value="${c.hex}">`+
       `<input type="text" class="hex" value="${c.hex}">`+
-      `<span class="pname">${c.name}</span>`+
+      `<input type="text" class="pname" value="${c.name}" title="label shown on the puzzles (e.g. ${c.name} 1)">`+
       (isPuzzle
         ? `<span style="font-size:0.74rem;color:#555">clues</span>
            <input type="number" class="clue" value="${cr[0]}" min="17" max="80">
@@ -529,16 +532,32 @@ function renderPaletteUI(){
       `<span class="count"></span>`;
     host.appendChild(row);
 
-    const [chk, colp, hex] = row.querySelectorAll('input');
+    const [chk, colp, hex, pname] = row.querySelectorAll('input');
     const clues = row.querySelectorAll('input.clue');
-    chk.onchange   = () => { c.on=chk.checked; row.classList.toggle('off',!c.on); detect(); renderPlanUI(); };
-    colp.oninput   = () => { c.hex=colp.value.toUpperCase(); hex.value=c.hex; detect(); renderPlanUI(); };
-    hex.onchange   = () => { if(/^#?[0-9a-fA-F]{6}$/.test(hex.value)){ c.hex='#'+hex.value.replace('#',''); colp.value=c.hex; detect(); renderPlanUI(); } };
+    chk.onchange   = () => { c.on=chk.checked; row.classList.toggle('off',!c.on); savePalette(); detect(); renderPlanUI(); };
+    colp.oninput   = () => { c.hex=colp.value.toUpperCase(); hex.value=c.hex; savePalette(); detect(); renderPlanUI(); };
+    hex.onchange   = () => { if(/^#?[0-9a-fA-F]{6}$/.test(hex.value)){ c.hex='#'+hex.value.replace('#',''); colp.value=c.hex; savePalette(); detect(); renderPlanUI(); } };
+    pname.oninput  = () => { c.name = pname.value || c.key; savePalette(); renderPlanUI(); };
     if (clues.length){
       clues[0].oninput = () => { CLUE_RANGES[c.key][0]=parseInt(clues[0].value,10); };
       clues[1].oninput = () => { CLUE_RANGES[c.key][1]=parseInt(clues[1].value,10); };
     }
   }
+}
+
+// ── Palette persistence (custom names + colors + on/off) ──
+const PALETTE_KEY = 'bookbuilder_palette';
+function savePalette(){
+  try { localStorage.setItem(PALETTE_KEY, JSON.stringify(
+    PALETTE.map(c=>({ key:c.key, name:c.name, hex:c.hex, on:c.on })))); } catch(e){}
+}
+function loadPalette(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(PALETTE_KEY) || 'null');
+    if (!saved) return;
+    for (const s of saved){ const c = PALETTE.find(p=>p.key===s.key);
+      if (c){ if (s.name) c.name=s.name; if (s.hex) c.hex=s.hex; if (typeof s.on==='boolean') c.on=s.on; } }
+  } catch(e){}
 }
 
 // ═══════════════════════════════════════════════════════
@@ -725,7 +744,7 @@ async function buildBook(){
         const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, null, false, fSudoku), px);
         const img = await pdfDoc.embedPng(png);
         placeImage(pg, box.rect, img);
-        if (lbl) replaceLabelGroup(pg, lbl, `${capCase(d,labelMode)} ${i+1}`, labelFont);
+        if (lbl) replaceLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${i+1}`, labelFont);
         bump(); $('detail').textContent=`Placing ${d} puzzle ${i+1}/${boxes.length}`;
         await new Promise(r=>setTimeout(r,0));
       }
@@ -749,7 +768,7 @@ async function buildBook(){
       const png = await svgToPngBytes(renderSudokuSVG(res.puzzle, res.solution, true, fSudoku), px);
       const img = await pdfDoc.embedPng(png);
       placeImage(pg, box.rect, img);
-      if (lbl) replaceLabelGroup(pg, lbl, `${capCase(d,labelMode)} ${idx}`, labelFont);
+      if (lbl) replaceLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${idx}`, labelFont);
       bump(); $('detail').textContent=`Placing answer ${j+1}/${aboxes.length}`;
       await new Promise(r=>setTimeout(r,0));
     }
@@ -834,6 +853,7 @@ for (const [sid,pid] of [['font-sudoku','fp-sudoku'],['font-label','fp-label'],[
 loadStoredFonts();
 populateFontSelects();
 updateAllFontPreviews();
+loadPalette(); // restore custom difficulty names + colors
 </script>
 </body>
 </html>
