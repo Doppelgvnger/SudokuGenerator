@@ -603,7 +603,28 @@ function drawSudoku(pg, rect, puzzle, solution, showSolution, font, outline){
 // ── Label replacement (orientation-aware) ──
 // Labels can be horizontal OR vertical (rotated 90°) and sit beside the box,
 // not just above it. We work in the item's own rotated frame.
-const LABEL_RE = /^(easy|medium|hard|extreme|surreal)\b/i;
+const DIFF_WORDS = ['EASY','MEDIUM','HARD','EXTREME','SURREAL'];
+// Optimal-string-alignment distance, early-out once it exceeds 1.
+function osaWithin1(a, b){
+  if (a===b) return true;
+  const la=a.length, lb=b.length;
+  if (Math.abs(la-lb) > 1) return false;
+  const d = Array.from({length:la+1}, ()=>new Array(lb+1).fill(0));
+  for (let i=0;i<=la;i++) d[i][0]=i;
+  for (let j=0;j<=lb;j++) d[0][j]=j;
+  for (let i=1;i<=la;i++) for (let j=1;j<=lb;j++){
+    const cost = a[i-1]===b[j-1] ? 0 : 1;
+    d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1]+cost);
+    if (i>1 && j>1 && a[i-1]===b[j-2] && a[i-2]===b[j-1]) d[i][j]=Math.min(d[i][j], d[i-2][j-2]+1); // transposition
+  }
+  return d[la][lb] <= 1;
+}
+// Does this text item look like a difficulty label? Typo-tolerant (≤1 edit /
+// transposition) so manuscript misspellings like "MEDUIM 4" still match.
+function looksLikeLabel(str){
+  const word = (str.trim().toUpperCase().match(/^[A-Z]+/) || [''])[0];
+  return word.length >= 3 && DIFF_WORDS.some(d => osaWithin1(word, d));
+}
 
 // Axis-aligned bounding box of a (possibly rotated) text item, in PDF points.
 function textBBox(it){
@@ -636,7 +657,7 @@ function findLabelGroup(pageData, boxRef, allRects){
     return br && Math.abs(br.x-bx)<0.5 && Math.abs(br.y-by)<0.5;
   };
   const cands = pageData.items.filter(it=>{
-    if (!LABEL_RE.test(it.str.trim())) return false;
+    if (!looksLikeLabel(it.str)) return false;
     const c = labelCenter(it);
     if (!(c.x>=bx-M && c.x<=bx+bw+M && c.y>=by-M && c.y<=by+bh+M)) return false;
     return owns(c);
@@ -646,10 +667,11 @@ function findLabelGroup(pageData, boxRef, allRects){
   return cands.filter(it=>it.fs >= maxFs-2); // the prominent label (+ its split runs)
 }
 
-// Cover the old label group and draw `text` in its place, preserving size,
-// orientation and centre.
-function replaceLabelGroup(pg, items, text, font){
-  items.forEach(it=>coverItem(pg,it));
+// Draw `text` in place of the old label group, preserving size, orientation and
+// centre. NOTE: covering the old text is done separately, BEFORE the sudoku is
+// drawn, so the sudoku stays the top layer (no white cover bleeding onto the
+// grid frame). This only draws the new text, on top.
+function drawLabelGroup(pg, items, text, font){
   const size = Math.max(...items.map(it=>it.fs));
   const deg  = Math.round(items[0].angle*180/Math.PI);
   const newW = font.widthOfTextAtSize(text, size);
@@ -757,7 +779,7 @@ async function buildBook(){
         const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
         if (lbl) lbl.forEach(it=>coverItem(pg,it));
         drawSudoku(pg, box.rect, res.puzzle, null, false, sudokuFont, outline);
-        if (lbl) replaceLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${i+1}`, labelFont);
+        if (lbl) drawLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${i+1}`, labelFont);
         bump(); $('detail').textContent=`Placing ${d} puzzle ${i+1}/${boxes.length}`;
         await new Promise(r=>setTimeout(r,0));
       }
@@ -778,7 +800,7 @@ async function buildBook(){
       const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
       if (lbl) lbl.forEach(it=>coverItem(pg,it));
       drawSudoku(pg, box.rect, res.puzzle, res.solution, true, sudokuFont, outline);
-      if (lbl) replaceLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${idx}`, labelFont);
+      if (lbl) drawLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${idx}`, labelFont);
       bump(); $('detail').textContent=`Placing answer ${j+1}/${aboxes.length}`;
       await new Promise(r=>setTimeout(r,0));
     }
