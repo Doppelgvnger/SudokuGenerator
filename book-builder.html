@@ -141,18 +141,6 @@
         <input type="file" id="fontfile" accept=".ttf,.otf" style="display:none">
       </div>
     </div>
-  </div>
-  <div class="sub" style="text-align:left;color:#555">Each of the three can use a different font. Uploaded fonts are embedded in the PDF and remembered in this browser.</div>
-</div>
-
-<!-- SETTINGS -->
-<div class="panel hidden" id="panel-settings">
-  <div class="panel-title">Output settings</div>
-  <div class="settings-grid">
-    <div class="field">
-      <label>Output</label>
-      <div class="row" style="font-size:0.82rem;color:#7a8a6a;letter-spacing:0.04em;">Vector · CMYK (pure&nbsp;K) — preserves the PDF's color profile</div>
-    </div>
     <div class="field">
       <label>Puzzle label style</label>
       <div class="row">
@@ -162,6 +150,23 @@
           <option value="lower">easy 1</option>
         </select>
       </div>
+    </div>
+    <div class="field">
+      <label>Label transparency <span id="label-transp-val" style="color:#7a8a6a">0%</span></label>
+      <div class="row"><input type="range" id="label-transparency" min="0" max="100" value="0" step="5" style="flex:1"
+        oninput="document.getElementById('label-transp-val').textContent=this.value+'%'"></div>
+    </div>
+  </div>
+  <div class="sub" style="text-align:left;color:#555">Each of the three can use a different font. Uploaded fonts are embedded in the PDF and remembered in this browser. Label transparency fades the puzzle labels (a lighter CMYK tint — stays print-safe).</div>
+</div>
+
+<!-- SETTINGS -->
+<div class="panel hidden" id="panel-settings">
+  <div class="panel-title">Output settings</div>
+  <div class="settings-grid">
+    <div class="field">
+      <label>Output</label>
+      <div class="row" style="font-size:0.82rem;color:#7a8a6a;letter-spacing:0.04em;">Vector · CMYK (pure&nbsp;K) — preserves the PDF's color profile</div>
     </div>
     <div class="field">
       <label>Grid outline</label>
@@ -671,20 +676,20 @@ function findLabelGroup(pageData, boxRef, allRects){
 // centre. NOTE: covering the old text is done separately, BEFORE the sudoku is
 // drawn, so the sudoku stays the top layer (no white cover bleeding onto the
 // grid frame). This only draws the new text, on top.
-function drawLabelGroup(pg, items, text, font){
+function drawLabelGroup(pg, items, text, font, color=INK_K){
   const size = Math.max(...items.map(it=>it.fs));
   const deg  = Math.round(items[0].angle*180/Math.PI);
   const newW = font.widthOfTextAtSize(text, size);
   if (Math.abs(deg) < 1){ // horizontal — centre on the union of the runs
     const minX=Math.min(...items.map(it=>it.x)), maxX=Math.max(...items.map(it=>it.x+it.w));
     const baseY=items.reduce((s,it)=>s+it.y,0)/items.length;
-    pg.drawText(text, { x:(minX+maxX)/2 - newW/2, y:baseY, size, font, color:INK_K });
+    pg.drawText(text, { x:(minX+maxX)/2 - newW/2, y:baseY, size, font, color });
   } else {                 // rotated — keep the same baseline, centre along reading dir
     const it=items[0], a=items[0].angle;
     pg.drawText(text, {
       x: it.x + ((it.w-newW)/2)*Math.cos(a),
       y: it.y + ((it.w-newW)/2)*Math.sin(a),
-      size, font, rotate: PDFLib.degrees(deg), color:INK_K,
+      size, font, rotate: PDFLib.degrees(deg), color,
     });
   }
 }
@@ -714,6 +719,9 @@ function stampPageNumbers(pages, font){
 async function buildBook(){
   const plan = buildPlan();
   const labelMode = $('labelcase').value;
+  // Label transparency → lighter CMYK K tint (0% = solid black, 100% = no ink).
+  // Stays pure-CMYK (no alpha/transparency group), so the print file is unaffected.
+  const labelColor = cmyk(0, 0, 0, 1 - (parseInt($('label-transparency').value,10)||0)/100);
   const doRelabel  = $('opt-relabel').checked;
   const doRenumber = $('opt-renumber').checked;
   const doFillPuz  = $('opt-fillpuz').checked;
@@ -779,7 +787,7 @@ async function buildBook(){
         const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
         if (lbl) lbl.forEach(it=>coverItem(pg,it));
         drawSudoku(pg, box.rect, res.puzzle, null, false, sudokuFont, outline);
-        if (lbl) drawLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${i+1}`, labelFont);
+        if (lbl) drawLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${i+1}`, labelFont, labelColor);
         bump(); $('detail').textContent=`Placing ${d} puzzle ${i+1}/${boxes.length}`;
         await new Promise(r=>setTimeout(r,0));
       }
@@ -800,7 +808,7 @@ async function buildBook(){
       const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
       if (lbl) lbl.forEach(it=>coverItem(pg,it));
       drawSudoku(pg, box.rect, res.puzzle, res.solution, true, sudokuFont, outline);
-      if (lbl) drawLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${idx}`, labelFont);
+      if (lbl) drawLabelGroup(pg, lbl, `${capCase(palName(d),labelMode)} ${idx}`, labelFont, labelColor);
       bump(); $('detail').textContent=`Placing answer ${j+1}/${aboxes.length}`;
       await new Promise(r=>setTimeout(r,0));
     }
