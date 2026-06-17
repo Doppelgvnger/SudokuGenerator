@@ -60,6 +60,12 @@
   .summary .stat .n { font-size:1.5rem; color:#ffd600; font-variant-numeric:tabular-nums; }
   .summary .stat .l { font-size:0.72rem; color:#777; letter-spacing:0.08em; text-transform:uppercase; }
   #verdict { font-size:0.9rem; letter-spacing:0.05em; }
+  #outline td { font-variant-numeric:tabular-nums; }
+  #outline td.pp { color:#888; white-space:nowrap; width:1%; padding-right:18px; }
+  #outline td.ct { text-align:right; color:#999; white-space:nowrap; }
+  #outline tr.divider td.lbl { color:#bbb; }
+  #outline tr.section td { padding-top:14px; color:#555; font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; border-bottom:none; }
+  #grand b { color:#ffd600; font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
@@ -94,6 +100,20 @@
   <div class="grid" id="count-grid"></div>
 </div>
 
+<!-- ── Extra pages ── -->
+<div class="panel">
+  <div class="panel-title">Extra pages</div>
+  <div class="grid">
+    <div class="field"><label>Table of contents</label><input type="number" id="x-toc" value="1" min="0" max="99" oninput="calc()"></div>
+    <div class="field"><label>Rules / how to play</label><input type="number" id="x-rules" value="1" min="0" max="99" oninput="calc()"></div>
+    <div class="field"><label>Other front pages</label><input type="number" id="x-front" value="0" min="0" max="99" oninput="calc()"></div>
+    <div class="field"><label>Thanks / about (back)</label><input type="number" id="x-thanks" value="1" min="0" max="99" oninput="calc()"></div>
+    <div class="field"><label>Divider page / difficulty</label><input type="number" id="x-divdiff" value="1" min="0" max="9" oninput="calc()"></div>
+    <div class="field"><label>Answers divider pages</label><input type="number" id="x-ansdiv" value="1" min="0" max="9" oninput="calc()"></div>
+  </div>
+  <div class="sub" style="text-align:left;color:#555">A divider is a whole page announcing a section (e.g. just "Medium") — one per used difficulty is placed before its puzzles. Set any to 0 to skip.</div>
+</div>
+
 <!-- ── Results ── -->
 <div class="panel">
   <div class="panel-title">Page plan</div>
@@ -102,7 +122,14 @@
   </tr></thead><tbody id="res-body"></tbody></table>
   <div class="summary" id="summary"></div>
   <div id="verdict"></div>
-  <div class="sub" style="text-align:left;color:#555">"Even" means a difficulty fills whole pages with no leftovers — so no page mixes two difficulties during a transition, in either the puzzle or the answer section. Counts above exclude chapter dividers, intro/TOC, etc.</div>
+  <div class="sub" style="text-align:left;color:#555">"Even" means a difficulty fills whole pages with no leftovers — so no page mixes two difficulties during a transition, in either the puzzle or the answer section.</div>
+</div>
+
+<!-- ── Full book outline ── -->
+<div class="panel">
+  <div class="panel-title">Full book outline</div>
+  <table class="res"><tbody id="outline"></tbody></table>
+  <div id="grand" style="font-size:1.05rem;letter-spacing:0.05em;color:#fff;border-top:1px solid #2a2a2a;padding-top:12px;"></div>
 </div>
 
 <script>
@@ -131,7 +158,11 @@ function calc(){
   const app = Math.max(1, parseInt($('app').value,10) || 1);
   const L = lcm(ppp, app);
 
-  let totPuz=0, totPP=0, totAP=0, uneven=0, used=0;
+  const xi = id => Math.max(0, parseInt($(id).value,10) || 0);
+  const toc=xi('x-toc'), rules=xi('x-rules'), front=xi('x-front'), thanks=xi('x-thanks'), divDiff=xi('x-divdiff'), ansDiv=xi('x-ansdiv');
+
+  let totPuz=0, totPP=0, totAP=0, uneven=0;
+  const used = [];                 // used difficulties in order (for the outline)
   let rows = '';
   for (const d of DIFFS){
     const N = Math.max(0, parseInt($('cnt-'+d.key).value,10) || 0);
@@ -141,12 +172,12 @@ function calc(){
             + `<td class="num">0</td><td class="num">—</td><td class="num">—</td><td>—</td></tr>`;
       continue;
     }
-    used++;
     const pp = Math.ceil(N/ppp), ap = Math.ceil(N/app);
     const pRem = N % ppp, aRem = N % app;
     totPP += pp; totAP += ap;
     const even = (pRem === 0 && aRem === 0);
     if (!even) uneven++;
+    used.push({ d, N, pp, ap });
 
     const ppCell = pRem ? `${pp} <span class="dim">(last ${pRem}/${ppp})</span>` : `${pp}`;
     const apCell = aRem ? `${ap} <span class="dim">(last ${aRem}/${app})</span>` : `${ap}`;
@@ -166,11 +197,18 @@ function calc(){
   }
   $('res-body').innerHTML = rows;
 
+  // ── extra pages + grand total ──
+  const dividers    = divDiff * used.length;          // one (or more) per used difficulty
+  const extraPages  = front + toc + rules + dividers + ansDiv + thanks;
+  const contentPages= totPP + totAP;
+  const totalBook   = contentPages + extraPages;
+
   $('summary').innerHTML = `
     <div class="stat"><span class="n">${totPuz}</span><span class="l">puzzles</span></div>
     <div class="stat"><span class="n">${totPP}</span><span class="l">puzzle pages</span></div>
     <div class="stat"><span class="n">${totAP}</span><span class="l">answer pages</span></div>
-    <div class="stat"><span class="n">${totPP+totAP}</span><span class="l">content pages</span></div>`;
+    <div class="stat"><span class="n">${extraPages}</span><span class="l">extra pages</span></div>
+    <div class="stat"><span class="n">${totalBook}</span><span class="l">total book</span></div>`;
 
   if (totPuz === 0){
     $('verdict').innerHTML = `<span class="dim">Enter some puzzle counts above.</span>`;
@@ -180,6 +218,40 @@ function calc(){
     $('verdict').innerHTML = `<span class="warn">⚠ ${uneven} difficult${uneven===1?'y':'ies'} would spill onto a partial page</span> `
       + `<span class="dim">(with ${ppp}/page puzzles &amp; ${app}/page answers, each difficulty's count should be a multiple of ${L}). Use the buttons to even them out.</span>`;
   }
+
+  // ── full book outline with running page numbers ──
+  let page = 1, ol = '';
+  const seg = (label, n, cls='', color='') => {
+    if (n <= 0) return;
+    const start = page, end = page + n - 1; page += n;
+    const range = (n === 1) ? `p ${start}` : `pp ${start}–${end}`;
+    const dot = color ? `<span class="dot" style="background:${color}"></span>` : '';
+    ol += `<tr class="${cls}"><td class="pp">${range}</td><td class="lbl">${dot}${label}</td><td class="ct">${n} pg</td></tr>`;
+  };
+  const hdr = t => { ol += `<tr class="section"><td colspan="3">${t}</td></tr>`; };
+
+  if (front+toc+rules > 0) hdr('Front matter');
+  seg('Title / other front pages', front);
+  seg('Table of contents', toc);
+  seg('Rules / how to play', rules);
+  if (used.length){
+    hdr('Puzzles');
+    for (const u of used){
+      seg(`${u.d.name} — divider`, divDiff, 'divider', u.d.color);
+      seg(`${u.d.name} — puzzles`, u.pp, '', u.d.color);
+    }
+  }
+  if (totAP > 0){
+    hdr('Answers');
+    seg('Answers — divider', ansDiv, 'divider');
+    seg('Answers', totAP);
+  }
+  if (thanks > 0){ hdr('Back matter'); seg('Thanks / about', thanks); }
+
+  $('outline').innerHTML = ol || `<tr><td class="dim">Nothing to lay out yet.</td></tr>`;
+  $('grand').innerHTML = totalBook
+    ? `Total book: <b>${totalBook}</b> pages &nbsp;·&nbsp; <span style="color:#999">${contentPages} content + ${extraPages} extra</span>`
+    : '';
 }
 calc();
 </script>
