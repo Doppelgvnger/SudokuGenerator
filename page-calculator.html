@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Page Calculator</title>
+<style>
+  @font-face { font-family:'DIN'; src:url('Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf') format('truetype'); }
+  :root { --ui-font:'DIN', sans-serif; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:#0d0d0d; color:#e0e0e0; font-family:var(--ui-font);
+    display:flex; flex-direction:column; align-items:center; min-height:100vh;
+    padding:0 20px 80px; gap:22px;
+  }
+  h1 { font-size:2.1rem; letter-spacing:0.12em; color:#fff; text-align:center; }
+  .sub { color:#666; font-size:0.85rem; letter-spacing:0.05em; text-align:center; max-width:660px; }
+
+  /* ── tab nav (shared across the 3 pages) ── */
+  .tabnav { display:flex; justify-content:center; gap:4px; width:100%; max-width:820px;
+    border-bottom:1px solid #2a2a2a; margin-top:8px; flex-wrap:wrap; }
+  .tabnav a { padding:13px 24px; color:#888; text-decoration:none; letter-spacing:0.1em;
+    font-size:0.92rem; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; white-space:nowrap; }
+  .tabnav a:hover { color:#ddd; }
+  .tabnav a.active { color:#fff; border-bottom-color:#ffd600; }
+
+  .panel { width:100%; max-width:760px; border:1px solid #2a2a2a; padding:20px 24px;
+    display:flex; flex-direction:column; gap:16px; }
+  .panel-title { font-size:0.72rem; letter-spacing:0.2em; color:#555; text-transform:uppercase; }
+
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:14px 20px; }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field label { font-size:0.74rem; letter-spacing:0.08em; color:#888; text-transform:uppercase; }
+  .field.easy label   { color:#7ed957; }
+  .field.medium label { color:#ffde59; }
+  .field.hard label   { color:#ff3131; }
+  .field.expert label { color:#ff751f; }
+  .field.master label { color:#cb6ce6; }
+  input[type=number] {
+    font-family:var(--ui-font); font-size:1.05rem; padding:8px 10px; border:1px solid #333;
+    background:#111; color:#ddd; outline:none; text-align:center; -moz-appearance:textfield;
+  }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; }
+  input[type=number]:focus { border-color:#607d8b; }
+
+  table.res { width:100%; border-collapse:collapse; font-size:0.9rem; }
+  table.res th, table.res td { text-align:left; padding:9px 10px; border-bottom:1px solid #1e1e1e; letter-spacing:0.03em; }
+  table.res th { color:#555; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.12em; }
+  table.res td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  table.res tr.zero td { color:#3a3a3a; }
+  .dim { color:#666; font-size:0.82em; }
+  .ok { color:#4caf50; } .warn { color:#ffb300; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:7px; vertical-align:middle; }
+  button.adj { font-family:var(--ui-font); font-size:0.8rem; letter-spacing:0.04em; padding:4px 9px;
+    border:1px solid #444; background:#1a1a1a; color:#bbb; cursor:pointer; margin-left:6px; }
+  button.adj:hover { border-color:#ffd600; color:#ffd600; }
+
+  .summary { display:flex; flex-wrap:wrap; gap:10px 28px; }
+  .summary .stat { display:flex; flex-direction:column; gap:2px; }
+  .summary .stat .n { font-size:1.5rem; color:#ffd600; font-variant-numeric:tabular-nums; }
+  .summary .stat .l { font-size:0.72rem; color:#777; letter-spacing:0.08em; text-transform:uppercase; }
+  #verdict { font-size:0.9rem; letter-spacing:0.05em; }
+</style>
+</head>
+<body>
+
+<nav class="tabnav">
+  <a href="index.html">Sudoku Generator</a>
+  <a href="book-builder.html">Book Builder</a>
+  <a href="page-calculator.html" class="active">Page Calculator</a>
+</nav>
+
+<h1>Page Calculator</h1>
+<div class="sub">Plan how your book's pages lay out. Enter how many of each puzzle you'll include and how many fit per page — it works out the page count per difficulty and flags where a difficulty would spill onto a shared/partial page, suggesting how many to add or remove.</div>
+
+<!-- ── Layout ── -->
+<div class="panel">
+  <div class="panel-title">Layout</div>
+  <div class="grid" style="max-width:360px">
+    <div class="field">
+      <label>Puzzles per page</label>
+      <input type="number" id="ppp" value="2" min="1" max="20" oninput="calc()">
+    </div>
+    <div class="field">
+      <label>Answers per page</label>
+      <input type="number" id="app" value="6" min="1" max="50" oninput="calc()">
+    </div>
+  </div>
+</div>
+
+<!-- ── Puzzle counts ── -->
+<div class="panel">
+  <div class="panel-title">Puzzles in the book</div>
+  <div class="grid" id="count-grid"></div>
+</div>
+
+<!-- ── Results ── -->
+<div class="panel">
+  <div class="panel-title">Page plan</div>
+  <table class="res"><thead><tr>
+    <th>Difficulty</th><th class="num">Puzzles</th><th class="num">Puzzle pages</th><th class="num">Answer pages</th><th>Even pages?</th>
+  </tr></thead><tbody id="res-body"></tbody></table>
+  <div class="summary" id="summary"></div>
+  <div id="verdict"></div>
+  <div class="sub" style="text-align:left;color:#555">"Even" means a difficulty fills whole pages with no leftovers — so no page mixes two difficulties during a transition, in either the puzzle or the answer section. Counts above exclude chapter dividers, intro/TOC, etc.</div>
+</div>
+
+<script>
+const DIFFS = [
+  { key:'easy',   name:'Easy',   color:'#7ed957', def:24 },
+  { key:'medium', name:'Medium', color:'#ffde59', def:24 },
+  { key:'hard',   name:'Hard',   color:'#ff3131', def:18 },
+  { key:'expert', name:'Expert', color:'#ff751f', def:12 },
+  { key:'master', name:'Master', color:'#cb6ce6', def:8  },
+];
+const $ = id => document.getElementById(id);
+const gcd = (a,b) => b ? gcd(b, a%b) : a;
+const lcm = (a,b) => (a && b) ? a/gcd(a,b)*b : 0;
+
+// build the count inputs
+$('count-grid').innerHTML = DIFFS.map(d =>
+  `<div class="field ${d.key}">
+     <label>${d.name}</label>
+     <input type="number" id="cnt-${d.key}" value="${d.def}" min="0" max="9999" oninput="calc()">
+   </div>`).join('');
+
+function setCount(key, v){ $('cnt-'+key).value = v; calc(); }
+
+function calc(){
+  const ppp = Math.max(1, parseInt($('ppp').value,10) || 1);
+  const app = Math.max(1, parseInt($('app').value,10) || 1);
+  const L = lcm(ppp, app);
+
+  let totPuz=0, totPP=0, totAP=0, uneven=0, used=0;
+  let rows = '';
+  for (const d of DIFFS){
+    const N = Math.max(0, parseInt($('cnt-'+d.key).value,10) || 0);
+    totPuz += N;
+    if (N === 0){
+      rows += `<tr class="zero"><td><span class="dot" style="background:#333"></span>${d.name}</td>`
+            + `<td class="num">0</td><td class="num">—</td><td class="num">—</td><td>—</td></tr>`;
+      continue;
+    }
+    used++;
+    const pp = Math.ceil(N/ppp), ap = Math.ceil(N/app);
+    const pRem = N % ppp, aRem = N % app;
+    totPP += pp; totAP += ap;
+    const even = (pRem === 0 && aRem === 0);
+    if (!even) uneven++;
+
+    const ppCell = pRem ? `${pp} <span class="dim">(last ${pRem}/${ppp})</span>` : `${pp}`;
+    const apCell = aRem ? `${ap} <span class="dim">(last ${aRem}/${app})</span>` : `${ap}`;
+
+    let statusCell;
+    if (even){
+      statusCell = `<span class="ok">✓ even</span>`;
+    } else {
+      const down = Math.floor(N/L)*L, up = Math.ceil(N/L)*L;
+      const btns = [];
+      if (down > 0) btns.push(`<button class="adj" onclick="setCount('${d.key}',${down})">remove ${N-down} → ${down}</button>`);
+      btns.push(`<button class="adj" onclick="setCount('${d.key}',${up})">add ${up-N} → ${up}</button>`);
+      statusCell = `<span class="warn">⚠ spills</span>${btns.join('')}`;
+    }
+    rows += `<tr><td><span class="dot" style="background:${d.color}"></span>${d.name}</td>`
+          + `<td class="num">${N}</td><td class="num">${ppCell}</td><td class="num">${apCell}</td><td>${statusCell}</td>`;
+  }
+  $('res-body').innerHTML = rows;
+
+  $('summary').innerHTML = `
+    <div class="stat"><span class="n">${totPuz}</span><span class="l">puzzles</span></div>
+    <div class="stat"><span class="n">${totPP}</span><span class="l">puzzle pages</span></div>
+    <div class="stat"><span class="n">${totAP}</span><span class="l">answer pages</span></div>
+    <div class="stat"><span class="n">${totPP+totAP}</span><span class="l">content pages</span></div>`;
+
+  if (totPuz === 0){
+    $('verdict').innerHTML = `<span class="dim">Enter some puzzle counts above.</span>`;
+  } else if (uneven === 0){
+    $('verdict').innerHTML = `<span class="ok">✓ Every difficulty fills whole pages — no mixed or partial pages.</span>`;
+  } else {
+    $('verdict').innerHTML = `<span class="warn">⚠ ${uneven} difficult${uneven===1?'y':'ies'} would spill onto a partial page</span> `
+      + `<span class="dim">(with ${ppp}/page puzzles &amp; ${app}/page answers, each difficulty's count should be a multiple of ${L}). Use the buttons to even them out.</span>`;
+  }
+}
+calc();
+</script>
+</body>
+</html>
