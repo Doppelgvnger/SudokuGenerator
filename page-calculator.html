@@ -66,6 +66,24 @@
   #outline tr.divider td.lbl { color:#bbb; }
   #outline tr.section td { padding-top:14px; color:#555; font-size:0.7rem; letter-spacing:0.12em; text-transform:uppercase; border-bottom:none; }
   #grand b { color:#ffd600; font-variant-numeric:tabular-nums; }
+
+  .extra-head { display:flex; align-items:center; gap:8px; font-size:0.66rem; letter-spacing:0.12em; color:#555; text-transform:uppercase; padding-bottom:4px; }
+  .extra-head span:nth-child(1){ width:34px; } .extra-head span:nth-child(2){ flex:1; }
+  .extra-head span:nth-child(3){ width:60px; text-align:center; } .extra-head span:nth-child(4){ width:78px; } .extra-head span:nth-child(5){ width:34px; }
+  .extra-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #161616; }
+  .extra-row .reorder { display:flex; flex-direction:column; gap:2px; width:34px; }
+  .extra-row .mv { font-size:0.6rem; line-height:1; padding:2px 0; border:1px solid #333; background:#1a1a1a; color:#999; cursor:pointer; }
+  .extra-row .mv:disabled { opacity:0.22; cursor:default; }
+  .extra-row .mv:hover:not(:disabled){ border-color:#888; color:#fff; }
+  .extra-row input.ex-name { flex:1; font-family:var(--ui-font); font-size:0.95rem; padding:7px 9px; border:1px solid #333; background:#111; color:#ddd; outline:none; }
+  .extra-row input.ex-pages { width:60px; text-align:center; font-family:var(--ui-font); font-size:0.95rem; padding:7px 4px; border:1px solid #333; background:#111; color:#ddd; outline:none; -moz-appearance:textfield; }
+  .extra-row input.ex-pages::-webkit-inner-spin-button, .extra-row input.ex-pages::-webkit-outer-spin-button { -webkit-appearance:none; }
+  .extra-row select.ex-side { width:78px; font-family:var(--ui-font); font-size:0.85rem; padding:7px 6px; border:1px solid #333; background:#111; color:#bbb; outline:none; }
+  .extra-row input:focus, .extra-row select:focus { border-color:#607d8b; }
+  .extra-row .ex-del { width:34px; border:1px solid #333; background:#1a1a1a; color:#666; cursor:pointer; padding:7px 0; font-size:0.85rem; }
+  .extra-row .ex-del:hover { border-color:#f44336; color:#f44336; }
+  #btn-add-extra { margin-top:12px; font-family:var(--ui-font); font-size:0.88rem; letter-spacing:0.06em; padding:9px 18px; border:1px solid #444; background:#1a1a1a; color:#bbb; cursor:pointer; }
+  #btn-add-extra:hover { border-color:#ffd600; color:#ffd600; }
 </style>
 </head>
 <body>
@@ -81,8 +99,8 @@
 
 <!-- ── Layout ── -->
 <div class="panel">
-  <div class="panel-title">Layout</div>
-  <div class="grid" style="max-width:360px">
+  <div class="panel-title">Layout &amp; section dividers</div>
+  <div class="grid" style="max-width:520px">
     <div class="field">
       <label>Puzzles per page</label>
       <input type="number" id="ppp" value="2" min="1" max="20" oninput="calc()">
@@ -91,7 +109,16 @@
       <label>Answers per page</label>
       <input type="number" id="app" value="6" min="1" max="50" oninput="calc()">
     </div>
+    <div class="field">
+      <label>Divider / difficulty</label>
+      <input type="number" id="x-divdiff" value="1" min="0" max="9" oninput="calc()">
+    </div>
+    <div class="field">
+      <label>Answers divider</label>
+      <input type="number" id="x-ansdiv" value="1" min="0" max="9" oninput="calc()">
+    </div>
   </div>
+  <div class="sub" style="text-align:left;color:#555">A divider is a whole page announcing a section (e.g. just "Medium") — one per used difficulty is placed before its puzzles. Set to 0 to skip.</div>
 </div>
 
 <!-- ── Puzzle counts ── -->
@@ -100,18 +127,13 @@
   <div class="grid" id="count-grid"></div>
 </div>
 
-<!-- ── Extra pages ── -->
+<!-- ── Front & back matter ── -->
 <div class="panel">
-  <div class="panel-title">Extra pages</div>
-  <div class="grid">
-    <div class="field"><label>Table of contents</label><input type="number" id="x-toc" value="1" min="0" max="99" oninput="calc()"></div>
-    <div class="field"><label>Rules / how to play</label><input type="number" id="x-rules" value="1" min="0" max="99" oninput="calc()"></div>
-    <div class="field"><label>Other front pages</label><input type="number" id="x-front" value="0" min="0" max="99" oninput="calc()"></div>
-    <div class="field"><label>Thanks / about (back)</label><input type="number" id="x-thanks" value="1" min="0" max="99" oninput="calc()"></div>
-    <div class="field"><label>Divider page / difficulty</label><input type="number" id="x-divdiff" value="1" min="0" max="9" oninput="calc()"></div>
-    <div class="field"><label>Answers divider pages</label><input type="number" id="x-ansdiv" value="1" min="0" max="9" oninput="calc()"></div>
-  </div>
-  <div class="sub" style="text-align:left;color:#555">A divider is a whole page announcing a section (e.g. just "Medium") — one per used difficulty is placed before its puzzles. Set any to 0 to skip.</div>
+  <div class="panel-title">Front &amp; back matter</div>
+  <div class="extra-head"><span></span><span>Page</span><span>Pages</span><span>Side</span><span></span></div>
+  <div id="extras-list"></div>
+  <button id="btn-add-extra">＋ Add page</button>
+  <div class="sub" style="text-align:left;color:#555">Use ▲▼ to reorder. Each page is placed in Front matter (before the puzzles) or Back matter (after the answers); the order within each follows this list.</div>
 </div>
 
 <!-- ── Results ── -->
@@ -153,13 +175,43 @@ $('count-grid').innerHTML = DIFFS.map(d =>
 
 function setCount(key, v){ $('cnt-'+key).value = v; calc(); }
 
+// ── Front/back matter: a reorderable list of named pages ──
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let extras = [
+  { name:'Table of contents', pages:1, side:'front' },
+  { name:'Rules / how to play', pages:1, side:'front' },
+  { name:'Thanks / about',     pages:1, side:'back'  },
+];
+function renderExtras(){
+  $('extras-list').innerHTML = extras.map((e,i)=>`
+    <div class="extra-row">
+      <div class="reorder">
+        <button class="mv" ${i===0?'disabled':''} onclick="moveExtra(${i},-1)" title="move up">▲</button>
+        <button class="mv" ${i===extras.length-1?'disabled':''} onclick="moveExtra(${i},1)" title="move down">▼</button>
+      </div>
+      <input type="text" class="ex-name" value="${esc(e.name)}" oninput="editExtra(${i},'name',this.value)">
+      <input type="number" class="ex-pages" value="${e.pages}" min="0" max="99" oninput="editExtra(${i},'pages',this.value)">
+      <select class="ex-side" onchange="editExtra(${i},'side',this.value)">
+        <option value="front" ${e.side==='front'?'selected':''}>Front</option>
+        <option value="back"  ${e.side==='back'?'selected':''}>Back</option>
+      </select>
+      <button class="ex-del" onclick="removeExtra(${i})" title="remove">✕</button>
+    </div>`).join('');
+}
+function editExtra(i,k,v){ extras[i][k] = (k==='pages') ? Math.max(0, parseInt(v,10)||0) : v; calc(); }
+function moveExtra(i,dir){ const j=i+dir; if(j<0||j>=extras.length) return; [extras[i],extras[j]]=[extras[j],extras[i]]; renderExtras(); calc(); }
+function removeExtra(i){ extras.splice(i,1); renderExtras(); calc(); }
+function addExtra(){ extras.push({ name:'New page', pages:1, side:'front' }); renderExtras(); calc(); }
+
 function calc(){
   const ppp = Math.max(1, parseInt($('ppp').value,10) || 1);
   const app = Math.max(1, parseInt($('app').value,10) || 1);
   const L = lcm(ppp, app);
 
   const xi = id => Math.max(0, parseInt($(id).value,10) || 0);
-  const toc=xi('x-toc'), rules=xi('x-rules'), front=xi('x-front'), thanks=xi('x-thanks'), divDiff=xi('x-divdiff'), ansDiv=xi('x-ansdiv');
+  const divDiff = xi('x-divdiff'), ansDiv = xi('x-ansdiv');
+  const frontExtras = extras.filter(e=>e.side==='front'), backExtras = extras.filter(e=>e.side==='back');
+  const frontPages  = frontExtras.reduce((s,e)=>s+e.pages,0), backPages = backExtras.reduce((s,e)=>s+e.pages,0);
 
   let totPuz=0, totPP=0, totAP=0, uneven=0;
   const used = [];                 // used difficulties in order (for the outline)
@@ -199,7 +251,7 @@ function calc(){
 
   // ── extra pages + grand total ──
   const dividers    = divDiff * used.length;          // one (or more) per used difficulty
-  const extraPages  = front + toc + rules + dividers + ansDiv + thanks;
+  const extraPages  = frontPages + backPages + dividers + ansDiv;
   const contentPages= totPP + totAP;
   const totalBook   = contentPages + extraPages;
 
@@ -230,10 +282,8 @@ function calc(){
   };
   const hdr = t => { ol += `<tr class="section"><td colspan="3">${t}</td></tr>`; };
 
-  if (front+toc+rules > 0) hdr('Front matter');
-  seg('Title / other front pages', front);
-  seg('Table of contents', toc);
-  seg('Rules / how to play', rules);
+  if (frontExtras.some(e=>e.pages>0)) hdr('Front matter');
+  for (const e of frontExtras) seg(esc(e.name), e.pages);
   if (used.length){
     hdr('Puzzles');
     for (const u of used){
@@ -246,13 +296,16 @@ function calc(){
     seg('Answers — divider', ansDiv, 'divider');
     seg('Answers', totAP);
   }
-  if (thanks > 0){ hdr('Back matter'); seg('Thanks / about', thanks); }
+  if (backExtras.some(e=>e.pages>0)) hdr('Back matter');
+  for (const e of backExtras) seg(esc(e.name), e.pages);
 
   $('outline').innerHTML = ol || `<tr><td class="dim">Nothing to lay out yet.</td></tr>`;
   $('grand').innerHTML = totalBook
     ? `Total book: <b>${totalBook}</b> pages &nbsp;·&nbsp; <span style="color:#999">${contentPages} content + ${extraPages} extra</span>`
     : '';
 }
+$('btn-add-extra').onclick = addExtra;
+renderExtras();
 calc();
 </script>
 </body>
