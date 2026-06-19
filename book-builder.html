@@ -246,6 +246,7 @@ const CONFIG = {
 };
 
 let masterBytes = null;   // original PDF bytes for pdf-lib
+let masterName = 'sudoku_book'; // uploaded manuscript's name (no extension), for the output filename
 let pageCache  = null;    // [{imgData, W, H, Wpt, Hpt, items}]
 let analysis   = null;    // detection result
 let lastOutput = null;    // { blob, name } of the most recent built PDF (for re-download)
@@ -851,7 +852,7 @@ async function buildBook(){
   // print-PDF structure; pdf-lib appends our CMYK content and leaves the
   // original CMYK objects + OutputIntent untouched.
   const out = await pdfDoc.save({ useObjectStreams:false });
-  lastOutput = { blob: new Blob([out], { type:'application/pdf' }), name:'sudoku_book_filled.pdf' };
+  lastOutput = { blob: new Blob([out], { type:'application/pdf' }), name:`${masterName} filled.pdf` };
   downloadBlob(lastOutput.blob, lastOutput.name);
   $('btn-download-again').classList.remove('hidden');
 
@@ -895,6 +896,7 @@ async function handleFile(file){
   $('previews').innerHTML='';
   const buf = await file.arrayBuffer();
   masterBytes = new Uint8Array(buf);
+  masterName = (file.name || 'sudoku_book').replace(/\.pdf$/i, '');
   await ensureFont(FONTS[0]); // warm the default (DIN)
   pageCache = await analyzePages(masterBytes);
   detect();
