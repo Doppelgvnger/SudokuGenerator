@@ -54,6 +54,8 @@
   .palette-row input[type=color] { width:34px; height:30px; border:1px solid #333; background:#111; padding:0; cursor:pointer; }
   .palette-row input.pname { width:104px; font-size:0.9rem; letter-spacing:0.04em; padding:6px 8px; border:1px solid #333; background:#111; color:#ddd; outline:none; }
   .palette-row input.pname:focus { border-color:#607d8b; }
+  .palette-row button.revert { padding:5px 9px; border:1px solid #333; background:#1a1a1a; color:#888; cursor:pointer; font-size:0.95rem; line-height:1; }
+  .palette-row button.revert:hover { border-color:#90a4ae; color:#cfd8dc; }
   .palette-row input[type=text].hex { width:84px; }
   .palette-row .count { font-size:0.78rem; color:#888; margin-left:auto; }
   .palette-row.off { opacity:0.4; }
@@ -230,21 +232,30 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 // ── Palette (exact Canva placeholder colors) ──
+// Defaults are the colors as they appear AFTER the CMYK export (what detection
+// actually sees), sampled from the manuscripts — not the in-design values, which
+// shift on CMYK export. Green/yellow/red were consistent across books; the
+// answer blue varies between books, so this is one common value (use the picker
+// + per-row reset for the rest).
 const PALETTE = [
-  { key:'easy',    name:'Easy',    hex:'#7ED957', role:'puzzle', on:true  }, // green
-  { key:'medium',  name:'Medium',  hex:'#FFDE59', role:'puzzle', on:true  }, // yellow
-  { key:'hard',    name:'Hard',    hex:'#FF3131', role:'puzzle', on:true  }, // red
+  { key:'easy',    name:'Easy',    hex:'#7BC96B', role:'puzzle', on:true  }, // green
+  { key:'medium',  name:'Medium',  hex:'#FFDD6D', role:'puzzle', on:true  }, // yellow
+  { key:'hard',    name:'Hard',    hex:'#FF4338', role:'puzzle', on:true  }, // red
   { key:'extreme', name:'Extreme', hex:'#FF751F', role:'puzzle', on:true  }, // orange
   { key:'surreal', name:'Surreal', hex:'#CB6CE6', role:'puzzle', on:true  }, // purple
   { key:'answer',  name:'Answers', hex:'#0B2F7D', role:'answer', on:true  }, // blue
 ];
+// Snapshot the built-in defaults BEFORE any saved palette overrides them, so the
+// per-row "reset" button can always restore the original color.
+const PALETTE_DEFAULTS = Object.fromEntries(PALETTE.map(c => [c.key, c.hex]));
 const DIFF_ORDER = ['easy','medium','hard','extreme','surreal'];
 const CLUE_RANGES = JSON.parse(JSON.stringify(DEFAULT_CLUE_RANGES));
 
 const CONFIG = {
   // Boxes are read straight from the PDF's vector content (filled rectangles),
   // so recognition is inherently strict: a real rectangle of an exact fill color.
-  strictColorTol:38,  // STRICT color: a box's fill must be within this RGB distance of a palette color
+  strictColorTol:52,  // color match: a box's fill must be within this RGB distance of a palette color
+                      // (forgiving enough that a hand-picked colour near the real one still matches)
   minBoxPt:55,        // min box side (points)
   maxAspect:2.6,      // STRICT rectangle: reject non-box-shaped rects (w/h or h/w beyond this)
   maxBoxFrac:0.6,     // reject rects larger than this fraction of the page (backgrounds)
@@ -456,6 +467,7 @@ function detectBoxesFromCache(pc){
 }
 
 function detect(){
+  if (!pageCache) return null; // no PDF analyzed yet (e.g. palette tweaked early)
   const pages = pageCache.map((pc,i)=>({ index:i+1, Wpt:pc.Wpt, Hpt:pc.Hpt, items:pc.items, boxes:detectBoxesFromCache(pc) }));
   analysis = { numPages: pageCache.length, pages };
   return analysis;
@@ -536,6 +548,7 @@ function renderPaletteUI(){
       `<input type="checkbox" ${c.on?'checked':''} title="use this difficulty">`+
       `<input type="color" value="${c.hex}">`+
       `<input type="text" class="hex" value="${c.hex}">`+
+      `<button class="revert" type="button" title="reset to default (${PALETTE_DEFAULTS[c.key]})">↺</button>`+
       `<input type="text" class="pname" value="${c.name}" title="label shown on the puzzles (e.g. ${c.name} 1)">`+
       (isPuzzle
         ? `<span style="font-size:0.74rem;color:#555">clues</span>
@@ -551,6 +564,7 @@ function renderPaletteUI(){
     chk.onchange   = () => { c.on=chk.checked; row.classList.toggle('off',!c.on); savePalette(); detect(); renderPlanUI(); };
     colp.oninput   = () => { c.hex=colp.value.toUpperCase(); hex.value=c.hex; savePalette(); detect(); renderPlanUI(); };
     hex.onchange   = () => { if(/^#?[0-9a-fA-F]{6}$/.test(hex.value)){ c.hex='#'+hex.value.replace('#',''); colp.value=c.hex; savePalette(); detect(); renderPlanUI(); } };
+    row.querySelector('.revert').onclick = () => { c.hex = PALETTE_DEFAULTS[c.key]; savePalette(); renderPaletteUI(); detect(); renderPlanUI(); };
     pname.oninput  = () => { c.name = pname.value || c.key; savePalette(); renderPlanUI(); };
     if (clues.length){
       clues[0].oninput = () => { CLUE_RANGES[c.key][0]=parseInt(clues[0].value,10); };
