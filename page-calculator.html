@@ -178,9 +178,11 @@ function setCount(key, v){ $('cnt-'+key).value = v; calc(); }
 // ── Front/back matter: a reorderable list of named pages ──
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let extras = [
+  { name:'Title',             pages:1, side:'front' },
+  { name:'ISBN',              pages:1, side:'front' },
+  { name:'Thanks / about',    pages:1, side:'front' },
+  { name:'Rules',             pages:2, side:'front' },
   { name:'Table of contents', pages:1, side:'front' },
-  { name:'Rules / how to play', pages:1, side:'front' },
-  { name:'Thanks / about',     pages:1, side:'back'  },
 ];
 function renderExtras(){
   $('extras-list').innerHTML = extras.map((e,i)=>`

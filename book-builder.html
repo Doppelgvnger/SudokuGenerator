@@ -165,8 +165,13 @@
       <div class="row"><input type="range" id="label-transparency" min="0" max="100" value="0" step="5" style="flex:1"
         oninput="document.getElementById('label-transp-val').textContent=this.value+'%'"></div>
     </div>
+    <div class="field">
+      <label>Page number transparency <span id="page-transp-val" style="color:#7a8a6a">0%</span></label>
+      <div class="row"><input type="range" id="page-transparency" min="0" max="100" value="0" step="5" style="flex:1"
+        oninput="document.getElementById('page-transp-val').textContent=this.value+'%'"></div>
+    </div>
   </div>
-  <div class="sub" style="text-align:left;color:#555">Each of the three can use a different font. Uploaded fonts are embedded in the PDF and remembered in this browser. Label transparency fades the puzzle labels (a lighter CMYK tint — stays print-safe).</div>
+  <div class="sub" style="text-align:left;color:#555">Each of the three can use a different font. Uploaded fonts are embedded in the PDF and remembered in this browser. Transparency fades the puzzle labels / page numbers with a lighter CMYK tint — stays print-safe.</div>
 </div>
 
 <!-- SETTINGS -->
@@ -716,7 +721,7 @@ function drawLabelGroup(pg, items, text, font, color=INK_K){
   pg.drawText(text, opts);
 }
 
-function stampPageNumbers(pages, font){
+function stampPageNumbers(pages, font, color=INK_K){
   const startPage = parseInt($('startPage').value,10) || 1;
   const startVal  = parseInt($('startVal').value,10);
   for (let p=startPage; p<=pages.length; p++){
@@ -734,7 +739,7 @@ function stampPageNumbers(pages, font){
     // number (e.g. "100" over "9") never overhangs its white box.
     const coverW = Math.max(it.w, tw), asc=size*0.82, desc=size*0.30, pad=1.3;
     pages[p-1].drawRectangle({ x:cx-coverW/2-pad, y:it.y-desc-pad, width:coverW+2*pad, height:asc+desc+2*pad, color:INK_PAPER });
-    pages[p-1].drawText(num, { x:cx-tw/2, y:it.y, size, font, color:INK_K });
+    pages[p-1].drawText(num, { x:cx-tw/2, y:it.y, size, font, color });
   }
 }
 
@@ -744,9 +749,10 @@ function stampPageNumbers(pages, font){
 async function buildBook(){
   const plan = buildPlan();
   const labelMode = $('labelcase').value;
-  // Label transparency → lighter CMYK K tint (0% = solid black, 100% = no ink).
-  // Stays pure-CMYK (no alpha/transparency group), so the print file is unaffected.
-  const labelColor = cmyk(0, 0, 0, 1 - (parseInt($('label-transparency').value,10)||0)/100);
+  // Label & page-number transparency → lighter CMYK K tint (0% = solid black,
+  // 100% = no ink). Stays pure-CMYK (no alpha), so the print file is unaffected.
+  const labelColor   = cmyk(0, 0, 0, 1 - (parseInt($('label-transparency').value,10)||0)/100);
+  const pageNumColor = cmyk(0, 0, 0, 1 - (parseInt($('page-transparency').value,10)||0)/100);
   const doRelabel  = $('opt-relabel').checked;
   const doRenumber = $('opt-renumber').checked;
   const doFillPuz  = $('opt-fillpuz').checked;
@@ -843,7 +849,7 @@ async function buildBook(){
   }
 
   // 5) page numbers
-  if (doRenumber){ setStatus('Renumbering pages…'); stampPageNumbers(pages, pageFont); }
+  if (doRenumber){ setStatus('Renumbering pages…'); stampPageNumbers(pages, pageFont, pageNumColor); }
 
   // 6) save + download. Keep the blob so the user can re-download if the
   //    browser's initial download prompt was dismissed/blocked.
