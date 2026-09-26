@@ -669,17 +669,33 @@ function textBBox(it){
 function labelCenter(it){ const b=textBBox(it); return { x:b.x+b.w/2, y:b.y+b.h/2 }; }
 
 // Where the replacement label is drawn (shared by the cover + the draw, so they
-// always agree). Preserves the old label's size, orientation and centre.
-function labelPlacement(items, text, font){
+// always agree). Preserves the old label's size and orientation. For horizontal
+// labels it is PAGE-AWARE: the manuscript mirrors labels across the spread — on a
+// left page the label hugs the grid's LEFT wall, on a right page its RIGHT wall
+// (verified: box L == label L on left pages, box R == label R on right pages). So
+// instead of re-centring the new text on the old centre (which makes a longer word
+// like "Easy 30" bulge symmetrically and overhang the grid), we pin the new
+// label's outer edge to the grid wall on the side it sits, and let it grow INWARD.
+// `box` = the grid rect this label belongs to ({x,y,w,h}); may be null.
+function labelPlacement(items, text, font, box){
   const size  = Math.max(...items.map(it=>it.fs));
   const angle = items[0].angle;
   const deg   = Math.round(angle*180/Math.PI);
   const newW  = font.widthOfTextAtSize(text, size);
   let x, y;
-  if (Math.abs(deg) < 1){ // horizontal — centre on the union of the runs
+  if (Math.abs(deg) < 1){ // horizontal
     const minX=Math.min(...items.map(it=>it.x)), maxX=Math.max(...items.map(it=>it.x+it.w));
-    x = (minX+maxX)/2 - newW/2;
+    const oldC = (minX+maxX)/2;
     y = items.reduce((s,it)=>s+it.y,0)/items.length;
+    if (box){
+      const off = oldC - (box.x + box.w/2);      // where the old label sits vs box centre
+      const th  = box.w*0.15;                     // dead-zone: treat as centred if within
+      if      (off < -th) x = box.x;              // left page  → left edge on grid left wall
+      else if (off >  th) x = box.x + box.w - newW; // right page → right edge on grid right wall
+      else                x = oldC - newW/2;      // label centred over box → keep centred
+    } else {
+      x = oldC - newW/2;                          // no box → old behaviour (centre on old)
+    }
   } else {                // rotated — keep baseline, centre along the reading dir
     const it=items[0];
     x = it.x + ((it.w-newW)/2)*Math.cos(angle);
@@ -691,8 +707,8 @@ function labelPlacement(items, text, font){
 // White-out the old label AND the footprint of the NEW text, so the cover box
 // always fully backs the replacement — a longer word (e.g. "Medium" over "Easy")
 // never overhangs the box.
-function coverLabel(pg, items, text, font){
-  const p = labelPlacement(items, text, font);
+function coverLabel(pg, items, text, font, box){
+  const p = labelPlacement(items, text, font, box);
   const boxes = items.map(textBBox);
   boxes.push(textBBox({ x:p.x, y:p.y, w:p.newW, fs:p.size, angle:p.angle }));
   let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
@@ -728,8 +744,8 @@ function findLabelGroup(pageData, boxRef, allRects){
 // centre. NOTE: covering the old text is done separately, BEFORE the sudoku is
 // drawn, so the sudoku stays the top layer (no white cover bleeding onto the
 // grid frame). This only draws the new text, on top.
-function drawLabelGroup(pg, items, text, font, color=INK_K){
-  const p = labelPlacement(items, text, font);
+function drawLabelGroup(pg, items, text, font, color=INK_K, box){
+  const p = labelPlacement(items, text, font, box);
   const opts = { x:p.x, y:p.y, size:p.size, font, color };
   if (Math.abs(p.deg) >= 1) opts.rotate = PDFLib.degrees(p.deg);
   pg.drawText(text, opts);
@@ -832,9 +848,9 @@ async function buildBook(){
         // so the sudoku stays the top layer over any overlap
         const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
         const newText = lbl ? `${capCase(palName(d),labelMode)} ${i+1}` : null;
-        if (lbl) coverLabel(pg, lbl, newText, labelFont);
+        if (lbl) coverLabel(pg, lbl, newText, labelFont, box.rect);
         drawSudoku(pg, box.rect, res.puzzle, null, false, sudokuFont, outline);
-        if (lbl) drawLabelGroup(pg, lbl, newText, labelFont, labelColor);
+        if (lbl) drawLabelGroup(pg, lbl, newText, labelFont, labelColor, box.rect);
         bump(); $('detail').textContent=`Placing ${d} puzzle ${i+1}/${boxes.length}`;
         await new Promise(r=>setTimeout(r,0));
       }
@@ -854,9 +870,9 @@ async function buildBook(){
       const allRects = pageData.boxes.map(b=>b.rect);
       const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
       const newText = lbl ? `${capCase(palName(d),labelMode)} ${idx}` : null;
-      if (lbl) coverLabel(pg, lbl, newText, labelFont);
+      if (lbl) coverLabel(pg, lbl, newText, labelFont, box.rect);
       drawSudoku(pg, box.rect, res.puzzle, res.solution, true, sudokuFont, outline);
-      if (lbl) drawLabelGroup(pg, lbl, newText, labelFont, labelColor);
+      if (lbl) drawLabelGroup(pg, lbl, newText, labelFont, labelColor, box.rect);
       bump(); $('detail').textContent=`Placing answer ${j+1}/${aboxes.length}`;
       await new Promise(r=>setTimeout(r,0));
     }
