@@ -91,6 +91,8 @@
   .extra-row .ex-del:hover { border-color:#f44336; color:#f44336; }
   #btn-add-extra { margin-top:12px; font-family:var(--ui-font); font-size:0.88rem; letter-spacing:0.06em; padding:9px 18px; border:1px solid #444; background:#1a1a1a; color:#bbb; cursor:pointer; }
   #btn-add-extra:hover { border-color:#ffd600; color:#ffd600; }
+  #btn-reset { font-family:var(--ui-font); font-size:0.8rem; letter-spacing:0.06em; padding:7px 14px; border:1px solid #333; background:#1a1a1a; color:#888; cursor:pointer; }
+  #btn-reset:hover { border-color:#ffd600; color:#ffd600; }
 </style>
 </head>
 <body>
@@ -103,6 +105,7 @@
 
 <h1>Page Calculator</h1>
 <div class="sub">Plan how your book's pages lay out. Enter how many of each puzzle you'll include and how many fit per page — it works out the page count per difficulty and flags where a difficulty would spill onto a shared/partial page, suggesting how many to add or remove.</div>
+<button id="btn-reset" title="Restore the default layout, counts and front/back matter">↺ Reset to defaults</button>
 
 <!-- ── Layout ── -->
 <div class="panel">
@@ -184,13 +187,14 @@ function setCount(key, v){ $('cnt-'+key).value = v; calc(); }
 
 // ── Front/back matter: a reorderable list of named pages ──
 const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-let extras = [
+const DEFAULT_EXTRAS = [
   { name:'Title',             pages:1, side:'front' },
   { name:'ISBN',              pages:1, side:'front' },
   { name:'Thanks / about',    pages:1, side:'front' },
   { name:'Rules',             pages:2, side:'front' },
   { name:'Table of contents', pages:1, side:'front' },
 ];
+let extras = DEFAULT_EXTRAS.map(e => ({ ...e }));
 function renderExtras(){
   $('extras-list').innerHTML = extras.map((e,i)=>`
     <div class="extra-row">
@@ -334,8 +338,17 @@ function loadState(){
       .map(e => ({ name:e.name, pages:Math.max(0, parseInt(e.pages,10)||0), side: e.side==='back' ? 'back' : 'front' }));
   } catch(e){ /* corrupt or unavailable — keep the defaults */ }
 }
+// Reset = input defaults straight from the markup (defaultValue) + a fresh copy of the default matter list.
+function resetPlan(){
+  if (!confirm('Reset the whole plan to the defaults? Your current counts and front/back-matter list will be replaced.')) return;
+  for (const id of FIELD_IDS) $(id).value = $(id).defaultValue;
+  extras = DEFAULT_EXTRAS.map(e => ({ ...e }));
+  renderExtras();
+  calc();   // also saves, overwriting the stored plan
+}
 
 $('btn-add-extra').onclick = addExtra;
+$('btn-reset').onclick = resetPlan;
 loadState();
 renderExtras();
 calc();
