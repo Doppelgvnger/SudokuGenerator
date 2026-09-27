@@ -56,7 +56,7 @@
   button#btn-generate:hover:not(:disabled) { background:#f9a825; color:#000; }
   /* Keyboard focus ring: buttons/selects suppress the default outline for mouse users;
      :focus-visible restores a visible indicator for keyboard navigation only. */
-  button:focus-visible, select:focus-visible { outline:2px solid #ffd600 !important; outline-offset:2px; }
+  button:focus-visible, select:focus-visible, #drop:focus-visible { outline:2px solid #ffd600 !important; outline-offset:2px; }
   /* Tactile press: 1px nudge on click (skipped for reduced-motion users) */
   @media (prefers-reduced-motion: no-preference) {
     button:active:not(:disabled) { transform:translateY(1px); }
@@ -127,7 +127,7 @@
 <h1>Sudoku Book Builder</h1>
 <div class="sub">Upload a manuscript PDF with color-coded placeholder squares. I detect the slots, generate verified sudokus, stamp them in, and renumber the pages &amp; puzzle labels.</div>
 
-<div id="drop">Drop a <b>PDF</b> here, or click to choose &nbsp;·&nbsp; <span style="color:#555">placeholders = solid color squares</span>
+<div id="drop" tabindex="0" role="button" aria-label="Drop a PDF here, or click to choose">Drop a <b>PDF</b> here, or click to choose &nbsp;·&nbsp; <span style="color:#555">placeholders = solid color squares</span>
   <input type="file" id="file" accept="application/pdf" style="display:none">
 </div>
 
@@ -968,6 +968,8 @@ async function handleFile(file){
 
 const drop=$('drop'), fileInput=$('file');
 drop.onclick=()=>fileInput.click();
+// Keyboard: the drop zone acts as a button (tabindex=0 role=button) — Enter/Space opens the file picker
+drop.onkeydown=e=>{ if (e.key==='Enter' || e.key===' '){ e.preventDefault(); fileInput.click(); } };
 fileInput.onchange=e=>handleFile(e.target.files[0]);
 drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('drag'); };
 drop.ondragleave=()=>drop.classList.remove('drag');
