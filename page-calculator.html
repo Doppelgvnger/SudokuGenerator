@@ -84,13 +84,23 @@
   .extra-row .mv { font-size:0.6rem; line-height:1; padding:2px 0; border:1px solid #333; background:#1a1a1a; color:#999; cursor:pointer; }
   .extra-row .mv:disabled { opacity:0.22; cursor:default; }
   .extra-row .mv:hover:not(:disabled){ border-color:#888; color:#fff; }
-  .extra-row input.ex-name { flex:1; font-family:var(--ui-font); font-size:0.95rem; padding:7px 9px; border:1px solid #333; background:#111; color:#ddd; outline:none; }
+  .extra-row input.ex-name { flex:1; min-width:0; font-family:var(--ui-font); font-size:0.95rem; padding:7px 9px; border:1px solid #333; background:#111; color:#ddd; outline:none; }
   .extra-row input.ex-pages { width:60px; text-align:center; font-family:var(--ui-font); font-size:0.95rem; padding:7px 4px; border:1px solid #333; background:#111; color:#ddd; outline:none; -moz-appearance:textfield; }
   .extra-row input.ex-pages::-webkit-inner-spin-button, .extra-row input.ex-pages::-webkit-outer-spin-button { -webkit-appearance:none; }
   .extra-row select.ex-side { width:78px; font-family:var(--ui-font); font-size:0.85rem; padding:7px 6px; border:1px solid #333; background:#111; color:#bbb; outline:none; }
   .extra-row input:focus, .extra-row select:focus { border-color:#607d8b; }
   .extra-row .ex-del { width:34px; border:1px solid #333; background:#1a1a1a; color:#666; cursor:pointer; padding:7px 0; font-size:0.85rem; }
   .extra-row .ex-del:hover { border-color:#f44336; color:#f44336; }
+  /* Fixed controls keep their size; only the name field gives up width as the panel narrows */
+  .extra-row .reorder, .extra-row input.ex-pages, .extra-row select.ex-side, .extra-row .ex-del { flex-shrink:0; }
+  .extra-row .ex-unit { display:none; font-size:0.72rem; color:#666; letter-spacing:0.06em; }
+  /* Phones: the name gets the first line to itself; pages / side / ✕ drop to a second line */
+  @media (max-width: 460px) {
+    .extra-head { display:none; }
+    .extra-row { flex-wrap:wrap; row-gap:6px; }
+    .extra-row input.ex-name { flex:1 1 calc(100% - 42px); }
+    .extra-row .ex-unit { display:inline; }
+  }
   #btn-add-extra { margin-top:12px; font-family:var(--ui-font); font-size:0.88rem; letter-spacing:0.06em; padding:9px 18px; border:1px solid #444; background:#1a1a1a; color:#bbb; cursor:pointer; }
   #btn-add-extra:hover { border-color:#ffd600; color:#ffd600; }
   #btn-reset { font-family:var(--ui-font); font-size:0.8rem; letter-spacing:0.06em; padding:7px 14px; border:1px solid #333; background:#1a1a1a; color:#888; cursor:pointer; }
@@ -210,7 +220,7 @@ function renderExtras(){
         <button class="mv" ${i===extras.length-1?'disabled':''} onclick="moveExtra(${i},1)" title="move down">▼</button>
       </div>
       <input type="text" class="ex-name" value="${esc(e.name)}" oninput="editExtra(${i},'name',this.value)">
-      <input type="number" class="ex-pages" value="${e.pages}" min="0" max="99" oninput="editExtra(${i},'pages',this.value)">
+      <input type="number" class="ex-pages" value="${e.pages}" min="0" max="99" oninput="editExtra(${i},'pages',this.value)"><span class="ex-unit">pg</span>
       <select class="ex-side" onchange="editExtra(${i},'side',this.value)">
         <option value="front" ${e.side==='front'?'selected':''}>Front</option>
         <option value="back"  ${e.side==='back'?'selected':''}>Back</option>
