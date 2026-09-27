@@ -15,3 +15,6 @@ desktop.ini
 # Editor
 .vscode/
 *.swp
+
+# Local dev notes / loop backlog (repo is public)
+/CLAUDE.md
