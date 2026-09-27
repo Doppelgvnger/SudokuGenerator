@@ -1230,9 +1230,41 @@ function validateRanges(difficulties) {
   return allOk;
 }
 
+// ── Persistence: remember the Book Composition panel (counts, clue ranges, PNG resolution) ──
+const COMPOSITION_KEY = 'sudoku_book_composition_v1';
+const COMPOSITION_IDS = ['easy','medium','hard','extreme','surreal']
+  .flatMap(d => [`inp-${d}`, `cr-${d}-min`, `cr-${d}-max`]).concat('select-scale');
+
+function saveComposition() {
+  try {
+    const vals = Object.fromEntries(COMPOSITION_IDS.map(id => [id, document.getElementById(id).value]));
+    localStorage.setItem(COMPOSITION_KEY, JSON.stringify(vals));
+  } catch (e) { /* storage unavailable (e.g. private mode) — panel still works, just won't remember */ }
+}
+
+function loadComposition() {
+  try {
+    const vals = JSON.parse(localStorage.getItem(COMPOSITION_KEY) || 'null');
+    if (!vals) return;
+    for (const id of COMPOSITION_IDS) {
+      const el = document.getElementById(id);
+      if (vals[id] == null) continue;
+      if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === vals[id])) continue; // never leave the select empty
+      el.value = vals[id];
+    }
+    // CLUE_RANGES is separate state that generate() reads — resync it from the restored inputs.
+    ['easy','medium','hard','extreme','surreal'].forEach(updateClueRange);
+  } catch (e) { /* corrupt or unavailable — keep the defaults */ }
+}
+
+const bookPanel = document.getElementById('book-panel');
+bookPanel.addEventListener('input',  saveComposition);
+bookPanel.addEventListener('change', saveComposition);
+
 // ── Init ──
 loadCustomFonts();
 prefetchFonts();
+loadComposition();
 updateTotal();
 </script>
 </body>
