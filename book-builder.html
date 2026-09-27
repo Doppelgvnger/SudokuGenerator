@@ -97,7 +97,12 @@
   /* minmax(0,1fr): a bare 1fr column can't shrink below its content (the nowrap font previews),
      which pushed the page sideways on phones. ≤760px two columns would clip the previews → one column. */
   .settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 24px; }
-  @media (max-width: 760px) { .settings-grid { grid-template-columns:minmax(0,1fr); } }
+  @media (max-width: 760px) {
+    .settings-grid { grid-template-columns:minmax(0,1fr); }
+    /* Scale the font previews with the screen so the 10-digit sample fits on phones.
+       DIN sample ≈ 12.85 × font-size wide; box text area ≈ 100vw − 112px → max ≈ 7.78vw − 8.7px. */
+    .settings-grid .font-preview { font-size:clamp(14px, calc(7.7vw - 9px), 1.45rem); }  /* scoped: must beat the later base .font-preview rule */
+  }
   .field { display:flex; flex-direction:column; gap:5px; }
   .field label { font-size:0.74rem; letter-spacing:0.08em; color:#777; text-transform:uppercase; }
   .field .row { display:flex; align-items:center; gap:8px; }
