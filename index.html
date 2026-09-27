@@ -191,7 +191,15 @@
     letter-spacing: 0.2em;
     color: #555;
     text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
+  button#btn-comp-reset {
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: none;
+    padding: 5px 12px; border: 1px solid #333; background: #1a1a1a; color: #888;
+  }
+  button#btn-comp-reset:hover { border-color: #ffd600; color: #ffd600; background: #1a1a1a; }
 
   .book-rows {
     display: flex;
@@ -407,7 +415,7 @@
 
 <!-- ── Book composition panel ── -->
 <div id="book-panel">
-  <div class="book-panel-title">Book Composition</div>
+  <div class="book-panel-title">Book Composition <button id="btn-comp-reset" title="Restore the default counts, clue ranges and PNG resolution">↺ Reset</button></div>
   <div class="book-rows">
 
     <div class="book-row">
@@ -1258,9 +1266,24 @@ function loadComposition() {
   } catch (e) { /* corrupt or unavailable — keep the defaults */ }
 }
 
+// Reset = defaults straight from the markup (input defaultValue / the option marked `selected`).
+function resetComposition() {
+  if (!confirm('Reset Book Composition to the defaults? Your counts, clue ranges and PNG resolution will be replaced.')) return;
+  for (const id of COMPOSITION_IDS) {
+    const el = document.getElementById(id);
+    el.value = el.tagName === 'SELECT'
+      ? ([...el.options].find(o => o.defaultSelected) || el.options[0]).value
+      : el.defaultValue;
+  }
+  ['easy','medium','hard','extreme','surreal'].forEach(updateClueRange); // resync CLUE_RANGES (what generate() reads)
+  updateTotal();
+  saveComposition();   // overwrite the stored panel
+}
+
 const bookPanel = document.getElementById('book-panel');
 bookPanel.addEventListener('input',  saveComposition);
 bookPanel.addEventListener('change', saveComposition);
+document.getElementById('btn-comp-reset').addEventListener('click', resetComposition);
 
 // ── Init ──
 loadCustomFonts();
