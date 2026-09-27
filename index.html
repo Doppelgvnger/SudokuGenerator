@@ -33,7 +33,8 @@
     src: url('Fonts/aileron/Aileron-SemiBold.otf') format('opentype');
   }
 
-  :root { --ui-font: 'DIN', sans-serif; }
+  /* --ui-font is the interface (always DIN); --puzzle-font is the picker's choice, used only for puzzle digits */
+  :root { --ui-font: 'DIN', sans-serif; --puzzle-font: 'DIN', sans-serif; }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -341,14 +342,14 @@
   }
   svg.sudoku-svg text.given {
     fill: #0a0a0a;
-    font-family: var(--ui-font);
+    font-family: var(--puzzle-font);
     font-size: 38px;
     dominant-baseline: central;
     text-anchor: middle;
   }
   svg.sudoku-svg text.solution {
     fill: #cc2020;
-    font-family: var(--ui-font);
+    font-family: var(--puzzle-font);
     font-size: 38px;
     dominant-baseline: central;
     text-anchor: middle;
@@ -748,7 +749,7 @@ function prefetchFonts() {
 function applyFont(idx) {
   fontIndex = idx;
   const f = FONTS[fontIndex];
-  document.documentElement.style.setProperty('--ui-font', f.family);
+  document.documentElement.style.setProperty('--puzzle-font', f.family);
   // Custom fonts are already base64 in the cache via their dataUri
   if (f.dataUri) fontB64Cache[f.name] = f.dataUri;
   if (state.puzzle) {
