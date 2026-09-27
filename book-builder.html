@@ -151,17 +151,17 @@
   <div class="panel-title">Fonts</div>
   <div class="settings-grid">
     <div class="field">
-      <label>Sudoku numbers</label>
+      <label for="font-sudoku">Sudoku numbers</label>
       <div class="row"><select id="font-sudoku" style="flex:1"></select></div>
       <div class="font-preview" id="fp-sudoku">5 3 7 1 9 2 4 6 8 0</div>
     </div>
     <div class="field">
-      <label>Puzzle labels (e.g. “Easy 1”)</label>
+      <label for="font-label">Puzzle labels (e.g. “Easy 1”)</label>
       <div class="row"><select id="font-label" style="flex:1"></select></div>
       <div class="font-preview" id="fp-label">Easy 1</div>
     </div>
     <div class="field">
-      <label>Page numbers</label>
+      <label for="font-page">Page numbers</label>
       <div class="row"><select id="font-page" style="flex:1"></select></div>
       <div class="font-preview" id="fp-page">1 2 3</div>
     </div>
@@ -173,7 +173,7 @@
       </div>
     </div>
     <div class="field">
-      <label>Puzzle label style</label>
+      <label for="labelcase">Puzzle label style</label>
       <div class="row">
         <select id="labelcase">
           <option value="title">Easy 1</option>
@@ -183,12 +183,12 @@
       </div>
     </div>
     <div class="field">
-      <label>Label transparency <span id="label-transp-val" style="color:#7a8a6a">0%</span></label>
+      <label for="label-transparency">Label transparency <span id="label-transp-val" style="color:#7a8a6a">0%</span></label>
       <div class="row"><input type="range" id="label-transparency" min="0" max="100" value="0" step="5" style="flex:1"
         oninput="document.getElementById('label-transp-val').textContent=this.value+'%'"></div>
     </div>
     <div class="field">
-      <label>Page number transparency <span id="page-transp-val" style="color:#7a8a6a">0%</span></label>
+      <label for="page-transparency">Page number transparency <span id="page-transp-val" style="color:#7a8a6a">0%</span></label>
       <div class="row"><input type="range" id="page-transparency" min="0" max="100" value="0" step="5" style="flex:1"
         oninput="document.getElementById('page-transp-val').textContent=this.value+'%'"></div>
     </div>
@@ -205,7 +205,7 @@
       <div class="row" style="font-size:0.82rem;color:#7a8a6a;letter-spacing:0.04em;">Vector · CMYK (pure&nbsp;K) — preserves the PDF's color profile</div>
     </div>
     <div class="field">
-      <label>Grid outline</label>
+      <label for="grid-outline">Grid outline</label>
       <div class="row">
         <select id="grid-outline">
           <option value="bold" selected>Bold (thick border)</option>
@@ -214,11 +214,11 @@
       </div>
     </div>
     <div class="field">
-      <label>Page numbering starts at PDF page</label>
+      <label for="startPage">Page numbering starts at PDF page</label>
       <div class="row"><input type="number" id="startPage" value="1" min="1" style="width:70px"></div>
     </div>
     <div class="field">
-      <label>…with printed number</label>
+      <label for="startVal">…with printed number</label>
       <div class="row"><input type="number" id="startVal" value="1" min="0" style="width:70px"></div>
     </div>
     <div class="field">
