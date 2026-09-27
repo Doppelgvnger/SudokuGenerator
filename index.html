@@ -91,6 +91,10 @@
   /* Keyboard focus ring: buttons/selects suppress the default outline for mouse users;
      :focus-visible restores a visible indicator for keyboard navigation only. */
   button:focus-visible, select:focus-visible { outline: 2px solid #ffd600 !important; outline-offset: 2px; }
+  /* Tactile press: 1px nudge on click (skipped for reduced-motion users) */
+  @media (prefers-reduced-motion: no-preference) {
+    button:active:not(:disabled) { transform: translateY(1px); }
+  }
 
   button#btn-easy.active    { border-color: #4caf50; color: #4caf50; }
   button#btn-medium.active  { border-color: #ff9800; color: #ff9800; }

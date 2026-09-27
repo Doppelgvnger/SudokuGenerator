@@ -54,6 +54,10 @@
   /* Keyboard focus ring: buttons/selects suppress the default outline for mouse users;
      :focus-visible restores a visible indicator for keyboard navigation only. */
   button:focus-visible, select:focus-visible { outline:2px solid #ffd600 !important; outline-offset:2px; }
+  /* Tactile press: 1px nudge on click (skipped for reduced-motion users) */
+  @media (prefers-reduced-motion: no-preference) {
+    button:active:not(:disabled) { transform:translateY(1px); }
+  }
 
   table.plan { width:100%; border-collapse:collapse; font-size:0.85rem; }
   table.plan th, table.plan td { text-align:left; padding:7px 10px; border-bottom:1px solid #1e1e1e; letter-spacing:0.04em; }

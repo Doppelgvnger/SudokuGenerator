@@ -93,6 +93,11 @@
   #btn-add-extra:hover { border-color:#ffd600; color:#ffd600; }
   #btn-reset { font-family:var(--ui-font); font-size:0.8rem; letter-spacing:0.06em; padding:7px 14px; border:1px solid #333; background:#1a1a1a; color:#888; cursor:pointer; }
   #btn-reset:hover { border-color:#ffd600; color:#ffd600; }
+  /* Same button feel as the other pages: eased hover + 1px press nudge (skipped for reduced-motion users) */
+  button { transition:border-color .15s ease, color .15s ease, background-color .15s ease, transform .15s ease; }
+  @media (prefers-reduced-motion: no-preference) {
+    button:active:not(:disabled) { transform:translateY(1px); }
+  }
 </style>
 </head>
 <body>
