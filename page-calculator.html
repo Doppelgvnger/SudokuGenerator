@@ -131,19 +131,19 @@
   <div class="panel-title">Layout &amp; section dividers</div>
   <div class="grid" style="max-width:520px">
     <div class="field">
-      <label>Puzzles per page</label>
+      <label for="ppp">Puzzles per page</label>
       <input type="number" id="ppp" value="2" min="1" max="20" oninput="calc()">
     </div>
     <div class="field">
-      <label>Answers per page</label>
+      <label for="app">Answers per page</label>
       <input type="number" id="app" value="6" min="1" max="50" oninput="calc()">
     </div>
     <div class="field">
-      <label>Divider / difficulty</label>
+      <label for="x-divdiff">Divider / difficulty</label>
       <input type="number" id="x-divdiff" value="1" min="0" max="9" oninput="calc()">
     </div>
     <div class="field">
-      <label>Answers divider</label>
+      <label for="x-ansdiv">Answers divider</label>
       <input type="number" id="x-ansdiv" value="1" min="0" max="9" oninput="calc()">
     </div>
   </div>
@@ -198,7 +198,7 @@ const lcm = (a,b) => (a && b) ? a/gcd(a,b)*b : 0;
 // build the count inputs
 $('count-grid').innerHTML = DIFFS.map(d =>
   `<div class="field ${d.key}">
-     <label>${d.name}</label>
+     <label for="cnt-${d.key}">${d.name}</label>
      <input type="number" id="cnt-${d.key}" value="${d.def}" min="0" max="9999" oninput="calc()">
    </div>`).join('');
 
@@ -218,16 +218,16 @@ function renderExtras(){
   $('extras-list').innerHTML = extras.map((e,i)=>`
     <div class="extra-row">
       <div class="reorder">
-        <button class="mv" ${i===0?'disabled':''} onclick="moveExtra(${i},-1)" title="move up">▲</button>
-        <button class="mv" ${i===extras.length-1?'disabled':''} onclick="moveExtra(${i},1)" title="move down">▼</button>
+        <button class="mv" ${i===0?'disabled':''} onclick="moveExtra(${i},-1)" title="move up" aria-label="Move up">▲</button>
+        <button class="mv" ${i===extras.length-1?'disabled':''} onclick="moveExtra(${i},1)" title="move down" aria-label="Move down">▼</button>
       </div>
-      <input type="text" class="ex-name" value="${esc(e.name)}" oninput="editExtra(${i},'name',this.value)">
-      <input type="number" class="ex-pages" value="${e.pages}" min="0" max="99" oninput="editExtra(${i},'pages',this.value)"><span class="ex-unit">pg</span>
-      <select class="ex-side" onchange="editExtra(${i},'side',this.value)">
+      <input type="text" class="ex-name" value="${esc(e.name)}" oninput="editExtra(${i},'name',this.value)" aria-label="Page name">
+      <input type="number" class="ex-pages" value="${e.pages}" min="0" max="99" oninput="editExtra(${i},'pages',this.value)" aria-label="Number of pages"><span class="ex-unit">pg</span>
+      <select class="ex-side" onchange="editExtra(${i},'side',this.value)" aria-label="Front or back matter">
         <option value="front" ${e.side==='front'?'selected':''}>Front</option>
         <option value="back"  ${e.side==='back'?'selected':''}>Back</option>
       </select>
-      <button class="ex-del" onclick="removeExtra(${i})" title="remove">✕</button>
+      <button class="ex-del" onclick="removeExtra(${i})" title="remove" aria-label="Remove page">✕</button>
     </div>`).join('');
 }
 function editExtra(i,k,v){ extras[i][k] = (k==='pages') ? Math.max(0, parseInt(v,10)||0) : v; calc(); }
