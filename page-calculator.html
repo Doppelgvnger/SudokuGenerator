@@ -50,6 +50,8 @@
   input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; }
   input[type=number]:focus { border-color:#607d8b; }
 
+  /* Narrow screens: the 5-column results table scrolls inside its panel instead of widening the page */
+  .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:#444 #111; }
   table.res { width:100%; border-collapse:collapse; font-size:0.9rem; }
   table.res th, table.res td { text-align:left; padding:9px 10px; border-bottom:1px solid #1e1e1e; letter-spacing:0.03em; }
   table.res th { color:#555; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.12em; }
@@ -154,9 +156,9 @@
 <!-- ── Results ── -->
 <div class="panel">
   <div class="panel-title">Page plan</div>
-  <table class="res"><thead><tr>
+  <div class="table-scroll"><table class="res"><thead><tr>
     <th>Difficulty</th><th class="num">Puzzles</th><th class="num">Puzzle pages</th><th class="num">Answer pages</th><th>Even pages?</th>
-  </tr></thead><tbody id="res-body"></tbody></table>
+  </tr></thead><tbody id="res-body"></tbody></table></div>
   <div class="summary" id="summary"></div>
   <div id="verdict"></div>
   <div class="sub" style="text-align:left;color:#555">"Even" means a difficulty fills whole pages with no leftovers — so no page mixes two difficulties during a transition, in either the puzzle or the answer section.</div>
