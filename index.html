@@ -24,6 +24,14 @@
     font-family: 'Vincendo';
     src: url('Fonts/vincendo/Vincendo-Regular.ttf') format('truetype');
   }
+  @font-face {
+    font-family: 'Inter';
+    src: url('Fonts/inter/Inter_24pt-Medium.ttf') format('truetype');
+  }
+  @font-face {
+    font-family: 'Aileron';
+    src: url('Fonts/aileron/Aileron-SemiBold.otf') format('opentype');
+  }
 
   :root { --ui-font: 'DIN', sans-serif; }
 
@@ -375,6 +383,8 @@
       <option value="0">Font: DIN</option>
       <option value="1">Font: Surreal</option>
       <option value="2">Font: Vincendo</option>
+      <option value="3">Font: Inter</option>
+      <option value="4">Font: Aileron</option>
     </select>
     <button class="btn-icon" title="Add font from file" onclick="triggerAddFont()">＋</button>
     <button class="btn-icon" id="btn-remove-font" title="Remove selected custom font" onclick="removeCurrentFont()" disabled>✕</button>
@@ -704,6 +714,8 @@ const FONTS = [
   { name: 'DIN',      family: "'DIN', sans-serif",      src: 'Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf' },
   { name: 'Surreal',  family: "'Surreal', sans-serif",  src: 'Fonts/surreal-psychedelic-typeface/Surreal.ttf' },
   { name: 'Vincendo', family: "'Vincendo', sans-serif", src: 'Fonts/vincendo/Vincendo-Regular.ttf' },
+  { name: 'Inter',    family: "'Inter', sans-serif",    src: 'Fonts/inter/Inter_24pt-Medium.ttf' },
+  { name: 'Aileron',  family: "'Aileron', sans-serif",  src: 'Fonts/aileron/Aileron-SemiBold.otf' },
 ];
 let fontIndex = 0;
 // Cache for base64-encoded font data URIs (used in standalone SVG exports)
@@ -717,8 +729,11 @@ async function fetchFontB64(fontObj) {
     return fontObj.dataUri;
   }
   const resp = await fetch(fontObj.src);
-  const buf  = await resp.arrayBuffer();
-  const b64  = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const bytes = new Uint8Array(await resp.arrayBuffer());
+  // Chunked: spreading a large font (e.g. Inter, ~340 KB) into one call overflows the stack.
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  const b64  = btoa(bin);
   const uri  = `data:font/truetype;base64,${b64}`;
   fontB64Cache[fontObj.name] = uri;
   return uri;
