@@ -772,6 +772,7 @@ function applyFont(idx) {
     renderToSVGElement(document.getElementById('svg-puzzle'),   state.puzzle, state.solution, false);
     renderToSVGElement(document.getElementById('svg-solution'), state.puzzle, state.solution, true);
   }
+  savePicks();
 }
 
 function changeFont() {
@@ -787,6 +788,25 @@ function changeOutline() {
     renderToSVGElement(document.getElementById('svg-puzzle'),   state.puzzle, state.solution, false);
     renderToSVGElement(document.getElementById('svg-solution'), state.puzzle, state.solution, true);
   }
+  savePicks();
+}
+
+// ── Persistence: remember the puzzle font + grid outline picks.
+//    Font is stored by NAME — custom-font indices shift when one is removed. ──
+const PICKS_KEY = 'sudoku_generator_picks_v1';
+function savePicks() {
+  try { localStorage.setItem(PICKS_KEY, JSON.stringify({ font: FONTS[fontIndex].name, outline: outlineStyle })); }
+  catch (e) { /* storage unavailable — picks just won't be remembered */ }
+}
+function loadPicks() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PICKS_KEY) || 'null');
+    if (!p) return;
+    const i = FONTS.findIndex(f => f.name === p.font);          // gone (e.g. custom font removed) → stay on DIN
+    if (i >= 0) { document.getElementById('select-font').value = i; changeFont(); }
+    const sel = document.getElementById('select-outline');
+    if ([...sel.options].some(o => o.value === p.outline)) { sel.value = p.outline; changeOutline(); }
+  } catch (e) { /* corrupt — keep the defaults */ }
 }
 
 // ─── Font manager ──────────────────────────────────────
@@ -1289,6 +1309,7 @@ document.getElementById('btn-comp-reset').addEventListener('click', resetComposi
 // ── Init ──
 loadCustomFonts();
 prefetchFonts();
+loadPicks();          // after loadCustomFonts, so a saved custom font can be found
 loadComposition();
 updateTotal();
 </script>
