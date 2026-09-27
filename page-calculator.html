@@ -312,8 +312,31 @@ function calc(){
   $('grand').innerHTML = totalBook
     ? `Total book: <b>${totalBook}</b> pages &nbsp;·&nbsp; <span style="color:#999">${contentPages} content + ${extraPages} extra</span>`
     : '';
+  saveState();
 }
+
+// ── Persistence: remember the plan across reloads (every change goes through calc) ──
+const STATE_KEY = 'pagecalc_state_v1';
+const FIELD_IDS = ['ppp', 'app', 'x-divdiff', 'x-ansdiv', ...DIFFS.map(d => 'cnt-'+d.key)];
+function saveState(){
+  try {
+    const fields = Object.fromEntries(FIELD_IDS.map(id => [id, $(id).value]));
+    localStorage.setItem(STATE_KEY, JSON.stringify({ fields, extras }));
+  } catch(e){ /* storage unavailable (e.g. private mode) — planner still works, just won't remember */ }
+}
+function loadState(){
+  try {
+    const s = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
+    if (!s) return;
+    for (const id of FIELD_IDS) if (s.fields && s.fields[id] != null) $(id).value = s.fields[id];
+    if (Array.isArray(s.extras)) extras = s.extras
+      .filter(e => e && typeof e.name === 'string')
+      .map(e => ({ name:e.name, pages:Math.max(0, parseInt(e.pages,10)||0), side: e.side==='back' ? 'back' : 'front' }));
+  } catch(e){ /* corrupt or unavailable — keep the defaults */ }
+}
+
 $('btn-add-extra').onclick = addExtra;
+loadState();
 renderExtras();
 calc();
 </script>
