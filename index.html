@@ -66,6 +66,11 @@
     font-size:0.92rem; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; white-space:nowrap; }
   .tabnav a:hover { color:#ddd; }
   .tabnav a.active { color:#fff; border-bottom-color:#ffd600; }
+  /* Hover: a thin gray underline grows from the centre, previewing the active tab's yellow one */
+  .tabnav a { position:relative; }
+  .tabnav a::after { content:''; position:absolute; left:0; right:0; bottom:-2px; height:2px; background:#555; transform:scaleX(0); }
+  .tabnav a:hover:not(.active)::after { transform:scaleX(1); }
+  @media (prefers-reduced-motion: no-preference) { .tabnav a::after { transition:transform .2s ease-out; } }
 
   /* ── Top controls row ── */
   .controls {
