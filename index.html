@@ -397,7 +397,7 @@
   <button id="btn-medium"  onclick="generate('medium')">Medium</button>
   <button id="btn-hard"    onclick="generate('hard')">Hard</button>
   <button id="btn-extreme" onclick="generate('extreme')">Extreme</button>
-  <button id="btn-surreal" onclick="generate('surreal')">Surreal</button>
+  <button id="btn-surreal" onclick="generate('surreal')">Master</button>
 
   <select id="select-outline" onchange="changeOutline()" title="Grid outline style">
     <option value="bold">Outline: Bold</option>
@@ -469,13 +469,13 @@
     </div>
 
     <div class="book-row">
-      <label class="lbl-surreal" for="inp-surreal">Surreal</label>
-      <input type="number" id="inp-surreal" aria-label="Surreal puzzle count" value="22" min="0" max="999" oninput="updateTotal()">
+      <label class="lbl-surreal" for="inp-surreal">Master</label>
+      <input type="number" id="inp-surreal" aria-label="Master puzzle count" value="22" min="0" max="999" oninput="updateTotal()">
       <span class="puzz-count" id="pc-surreal">22 puzzles</span>
       <span class="range-label">clues:</span>
-      <input type="number" class="inp-clue" id="cr-surreal-min" aria-label="Surreal minimum clues" value="23" min="17" max="80" oninput="updateClueRange('surreal')">
+      <input type="number" class="inp-clue" id="cr-surreal-min" aria-label="Master minimum clues" value="23" min="17" max="80" oninput="updateClueRange('surreal')">
       <span class="range-sep">–</span>
-      <input type="number" class="inp-clue" id="cr-surreal-max" aria-label="Surreal maximum clues" value="25" min="17" max="80" oninput="updateClueRange('surreal')">
+      <input type="number" class="inp-clue" id="cr-surreal-max" aria-label="Master maximum clues" value="25" min="17" max="80" oninput="updateClueRange('surreal')">
     </div>
 
   </div>
@@ -640,6 +640,9 @@ function solve(puzzle) {
   }
   return bt() ? grid : null;
 }
+
+// Display name per difficulty key (the key stays "surreal" so ids and saved settings keep working)
+const diffName = k => (k === 'surreal' ? 'master' : k);
 
 const CLUE_RANGES = {
   easy:    [37, 39],
@@ -978,7 +981,7 @@ function generate(difficulty) {
   // Validate range first — mark red and abort if broken
   if (!validateRange(difficulty)) {
     const [mn, mx] = CLUE_RANGES[difficulty];
-    setStatus(`Invalid clue range for ${difficulty} — min must be ≤ max, between 17 and 80.`, 'fail');
+    setStatus(`Invalid clue range for ${diffName(difficulty)} — min must be ≤ max, between 17 and 80.`, 'fail');
     return;
   }
 
@@ -986,13 +989,13 @@ function generate(difficulty) {
     document.getElementById('btn-'+d).classList.toggle('active', d === difficulty)
   );
   document.getElementById('btn-download').disabled = true;
-  setStatus('Generating ' + difficulty + ' puzzle…');
+  setStatus('Generating ' + diffName(difficulty) + ' puzzle…');
   setTimeout(() => {
     try {
       const result = generatePuzzleInRange(difficulty);
       if (!result) {
         const [mn, mx] = CLUE_RANGES[difficulty];
-        setStatus(`Could not reach ${mn}–${mx} clues for ${difficulty} in 30 attempts. Try widening the range.`, 'fail');
+        setStatus(`Could not reach ${mn}–${mx} clues for ${diffName(difficulty)} in 30 attempts. Try widening the range.`, 'fail');
         return;
       }
       const { puzzle, solution } = result;
@@ -1005,7 +1008,7 @@ function generate(difficulty) {
       if (!match) { generate(difficulty); return; }
       state = { puzzle, solution, difficulty };
       const clues = puzzle.flat().filter(v => v !== 0).length;
-      setStatus(`${difficulty.charAt(0).toUpperCase()+difficulty.slice(1)} — ${clues} clues — Solver verified ✓`, 'ok');
+      setStatus(`${diffName(difficulty).charAt(0).toUpperCase()+diffName(difficulty).slice(1)} — ${clues} clues — Solver verified ✓`, 'ok');
       renderToSVGElement(document.getElementById('svg-puzzle'),   puzzle, solution, false);
       renderToSVGElement(document.getElementById('svg-solution'), puzzle, solution, true);
       document.getElementById('btn-download').disabled = false;
@@ -1136,12 +1139,12 @@ async function downloadSingle() {
   const blob = await zip.generateAsync({ type:'blob' });
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
-    download: `sudoku_${state.difficulty}.zip`,
+    download: `sudoku_${diffName(state.difficulty)}.zip`,
   });
   a.click();
   URL.revokeObjectURL(a.href);
   const clues = state.puzzle.flat().filter(v => v!==0).length;
-  setStatus(`Downloaded — ${state.difficulty} — ${clues} clues ✓`, 'ok');
+  setStatus(`Downloaded — ${diffName(state.difficulty)} — ${clues} clues ✓`, 'ok');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1178,11 +1181,11 @@ async function generateBook() {
   let   done  = 0;
 
   for (const { difficulty, count } of plan) {
-    const folder    = zip.folder(difficulty);
-    const folderSol = zip.folder(difficulty + '/solutions');
+    const folder    = zip.folder(diffName(difficulty));
+    const folderSol = zip.folder(diffName(difficulty) + '/solutions');
 
     for (let i = 1; i <= count; i++) {
-      detail.textContent = `${difficulty} ${i}/${count}  —  ${done+1} of ${total} total`;
+      detail.textContent = `${diffName(difficulty)} ${i}/${count}  —  ${done+1} of ${total} total`;
 
       const result = generatePuzzleInRange(difficulty);
       if (!result) { i--; continue; } // couldn't hit range — retry puzzle
@@ -1203,7 +1206,7 @@ async function generateBook() {
 
       renderToSVGElement(document.getElementById('svg-puzzle'),   puzzle, solution, false);
       renderToSVGElement(document.getElementById('svg-solution'), puzzle, solution, true);
-      setStatus(`Generating… ${difficulty} ${i}/${count} — ${puzzle.flat().filter(v=>v!==0).length} clues`);
+      setStatus(`Generating… ${diffName(difficulty)} ${i}/${count} — ${puzzle.flat().filter(v=>v!==0).length} clues`);
 
       await yieldToBrowser();
     }

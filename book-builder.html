@@ -276,7 +276,7 @@ const PALETTE = [
   { key:'medium',  name:'Medium',  hex:'#FFDD6D', role:'puzzle', on:true  }, // yellow
   { key:'hard',    name:'Hard',    hex:'#FF4338', role:'puzzle', on:true  }, // red
   { key:'extreme', name:'Extreme', hex:'#FF751F', role:'puzzle', on:true  }, // orange
-  { key:'surreal', name:'Surreal', hex:'#CB6CE6', role:'puzzle', on:true  }, // purple
+  { key:'surreal', name:'Master',  hex:'#CB6CE6', role:'puzzle', on:true  }, // purple
   { key:'answer',  name:'Answers', hex:'#0B2F7D', role:'answer', on:true  }, // blue
 ];
 // Snapshot the built-in defaults BEFORE any saved palette overrides them, so the
@@ -620,6 +620,7 @@ function loadPalette(){
     const saved = JSON.parse(localStorage.getItem(PALETTE_KEY) || 'null');
     if (!saved) return;
     for (const s of saved){ const c = PALETTE.find(p=>p.key===s.key);
+      if (s.key==='surreal' && s.name==='Surreal') s.name='Master';   // old default name → new default (custom names kept)
       if (c){ if (s.name) c.name=s.name; if (s.hex) c.hex=s.hex; if (typeof s.on==='boolean') c.on=s.on; } }
   } catch(e){}
 }
@@ -667,7 +668,7 @@ function drawSudoku(pg, rect, puzzle, solution, showSolution, font, outline){
 // ── Label replacement (orientation-aware) ──
 // Labels can be horizontal OR vertical (rotated 90°) and sit beside the box,
 // not just above it. We work in the item's own rotated frame.
-const DIFF_WORDS = ['EASY','MEDIUM','HARD','EXTREME','SURREAL'];
+const DIFF_WORDS = ['EASY','MEDIUM','HARD','EXTREME','MASTER','SURREAL']; // SURREAL kept for older manuscripts
 // Optimal-string-alignment distance, early-out once it exceeds 1.
 function osaWithin1(a, b){
   if (a===b) return true;
