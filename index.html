@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="dark">
-<title>Sudoku Generator</title>
-<meta name="description" content="Generate print-ready Sudoku puzzles and full puzzle books — choose difficulty, fonts and grid style, then export as SVG and PNG.">
+<title>Play Sudoku</title>
+<meta name="description" content="Generate a Sudoku at your chosen difficulty and play it right in the browser — pencil marks, instant mistake highlighting, undo, and a solution you can reveal.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Sudoku Generator">
-<meta property="og:description" content="Generate print-ready Sudoku puzzles and full puzzle books — choose difficulty, fonts and grid style, then export as SVG and PNG.">
+<meta property="og:title" content="Play Sudoku">
+<meta property="og:description" content="Generate a Sudoku at your chosen difficulty and play it right in the browser — pencil marks, instant mistake highlighting, undo, and a solution you can reveal.">
 <meta property="og:url" content="https://doppelgvnger.github.io/SudokuGenerator/">
 <meta property="og:image" content="https://doppelgvnger.github.io/SudokuGenerator/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -22,27 +22,11 @@
     font-family: 'DIN';
     src: url('Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf') format('truetype');
   }
-  @font-face {
-    font-family: 'Surreal';
-    src: url('Fonts/surreal-psychedelic-typeface/Surreal.ttf') format('truetype');
-  }
-  @font-face {
-    font-family: 'Vincendo';
-    src: url('Fonts/vincendo/Vincendo-Regular.ttf') format('truetype');
-  }
-  @font-face {
-    font-family: 'Inter';
-    src: url('Fonts/inter/Inter_24pt-Medium.ttf') format('truetype');
-  }
-  @font-face {
-    font-family: 'Aileron';
-    src: url('Fonts/aileron/Aileron-SemiBold.otf') format('opentype');
-  }
 
-  /* --ui-font is the interface (always DIN); --puzzle-font is the picker's choice, used only for puzzle digits */
-  :root { --ui-font: 'DIN', sans-serif; --puzzle-font: 'DIN', sans-serif; }
+  :root { --ui-font: 'DIN', sans-serif; --board: min(calc(100vw - 40px), 486px); }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
 
   body {
     background: #0d0d0d;
@@ -53,7 +37,7 @@
     align-items: center;
     min-height: 100vh;
     padding: 0 20px 40px;
-    gap: 28px;
+    gap: 24px;
   }
 
   h1 {
@@ -76,15 +60,6 @@
   .tabnav a:hover:not(.active)::after { transform:scaleX(1); }
   @media (prefers-reduced-motion: no-preference) { .tabnav a::after { transition:transform .2s ease-out; } }
 
-  /* ── Top controls row ── */
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    justify-content: center;
-    align-items: center;
-  }
-
   button {
     font-family: var(--ui-font);
     font-size: 1rem;
@@ -98,105 +73,26 @@
     outline: none;
   }
   button:hover { border-color: #aaa; color: #fff; background: #222; }
-  button.active { border-color: #fff; color: #fff; background: #2a2a2a; }
+  button:disabled { opacity: 0.35; cursor: default; }
   /* Keyboard focus ring: buttons/selects suppress the default outline for mouse users;
      :focus-visible restores a visible indicator for keyboard navigation only. */
-  button:focus-visible, select:focus-visible { outline: 2px solid #ffd600 !important; outline-offset: 2px; }
+  button:focus-visible, select:focus-visible, #board:focus-visible { outline: 2px solid #ffd600 !important; outline-offset: 2px; }
   /* Tactile press: 1px nudge on click (skipped for reduced-motion users) */
   @media (prefers-reduced-motion: no-preference) {
     button:active:not(:disabled) { transform: translateY(1px); }
   }
 
-  button#btn-easy.active    { border-color: #4caf50; color: #4caf50; }
-  button#btn-medium.active  { border-color: #ff9800; color: #ff9800; }
-  button#btn-hard.active    { border-color: #f44336; color: #f44336; }
-  button#btn-extreme.active { border-color: #ff5722; color: #ff5722; }
-  button#btn-surreal.active { border-color: #9c27b0; color: #9c27b0; }
-
-  /* Download SVGs pairs with Download Blank Grid in the blue-gray secondary family;
-     the yellow accent stays reserved for the primary action (Generate Full Book). */
-  button#btn-download {
-    border-color: #546e7a; color: #78909c;
-  }
-  button#btn-download:hover { background: #263238; color: #cfd8dc; border-color: #90a4ae; }
-  button#btn-download:disabled { opacity: 0.35; cursor: default; }
-
-  button#btn-blank {
-    border-color: #546e7a; color: #78909c;
-  }
-  button#btn-blank:hover { background: #263238; color: #cfd8dc; border-color: #90a4ae; }
-
-  /* ── Font dropdown ── */
-  select#select-font, select#select-outline {
-    font-family: var(--ui-font);
-    font-size: 1rem;
-    letter-spacing: 0.08em;
-    padding: 11px 16px;
-    border: 2px solid #607d8b;
-    background: #1a1a1a;
-    color: #90a4ae;
-    cursor: pointer;
-    outline: none;
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2390a4ae' stroke-width='2' fill='none'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 36px;
-  }
-  select#select-font:hover, select#select-outline:hover { border-color: #90a4ae; color: #cfd8dc; }
-  select#select-font option, select#select-outline option { background: #1a1a1a; color: #ccc; }
-
-  /* ── Font manager row ── */
-  .font-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  button.btn-icon {
-    padding: 11px 14px;
-    font-size: 1.1rem;
-    letter-spacing: 0;
-    border-color: #444;
-    color: #888;
-    line-height: 1;
-  }
-  button.btn-icon:hover { border-color: #aaa; color: #fff; }
-  button#btn-remove-font {
-    color: #555;
-    border-color: #333;
-    font-size: 0.9rem;
-    padding: 11px 12px;
-  }
-  button#btn-remove-font:hover { border-color: #f44336; color: #f44336; background: #1a0a0a; }
-  button#btn-remove-font:disabled { opacity: 0.2; cursor: default; }
-
-  /* ── Status ── */
-  #status {
-    font-family: var(--ui-font);
-    font-size: 0.85rem;
-    letter-spacing: 0.08em;
-    color: #888;
-    min-height: 1.2em;
-    text-align: center;
-  }
-  #status.ok   { color: #4caf50; }
-  #status.fail { color: #f44336; }
-
-  /* ── Book composition panel ── */
-  #book-panel {
+  /* ── Difficulty panel ── */
+  #setup-panel {
     width: 100%;
-    max-width: 640px;
+    max-width: 720px;
     border: 1px solid #2a2a2a;
     padding: 20px 24px;
     display: flex;
     flex-direction: column;
     gap: 16px;
   }
-
-  .book-panel-title {
-    font-family: var(--ui-font);
+  .panel-title {
     font-size: 0.75rem;
     letter-spacing: 0.2em;
     color: #555;
@@ -211,38 +107,35 @@
   }
   button#btn-comp-reset:hover { border-color: #ffd600; color: #ffd600; background: #1a1a1a; }
 
-  .book-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
+  .setup-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 16px; }
 
-  .book-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;   /* narrow screens: clue range drops to a 2nd line instead of overflowing */
-    gap: 6px 12px;
-  }
-
-  .book-row label {
-    font-family: var(--ui-font);
-    font-size: 0.9rem;
-    letter-spacing: 0.08em;
-    width: 80px;
-    flex-shrink: 0;
-  }
-
-  .book-row label.lbl-easy    { color: #4caf50; }
-  .book-row label.lbl-medium  { color: #ff9800; }
-  .book-row label.lbl-hard    { color: #f44336; }
-  .book-row label.lbl-extreme { color: #ff5722; }
-  .book-row label.lbl-surreal { color: #9c27b0; }
-
-  .book-row input[type=number] {
+  select#difficulty {
     font-family: var(--ui-font);
     font-size: 1rem;
-    width: 70px;
-    padding: 6px 10px;
+    letter-spacing: 0.08em;
+    padding: 10px 36px 10px 16px;
+    border: 2px solid #607d8b;
+    background: #1a1a1a;
+    color: #cfd8dc;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2390a4ae' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  select#difficulty:hover { border-color: #90a4ae; }
+  select#difficulty option { background: #1a1a1a; color: #ccc; }
+
+  .clue-row { display: flex; align-items: center; gap: 8px; }
+  .clue-row .range-label { font-size: 0.78rem; color: #666; letter-spacing: 0.05em; white-space: nowrap; }
+  .clue-row .range-sep { font-size: 0.8rem; color: #444; }
+  .clue-row input {
+    font-family: var(--ui-font);
+    font-size: 1rem;
+    width: 52px;
+    padding: 6px 4px;
     border: 1px solid #333;
     background: #111;
     color: #ddd;
@@ -250,264 +143,177 @@
     text-align: center;
     -moz-appearance: textfield;
   }
-  .book-row input[type=number]::-webkit-inner-spin-button,
-  .book-row input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
-  .book-row input[type=number]:focus { border-color: #555; }
+  .clue-row input::-webkit-inner-spin-button,
+  .clue-row input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .clue-row input:focus { border-color: #555; }
+  .clue-row input.error { border-color: #f44336; background: #1a0505; color: #ff8a80; }
 
-  .book-row .puzz-count {
-    font-size: 0.8rem;
-    color: #444;
-    letter-spacing: 0.05em;
-  }
+  button#btn-generate { border-color: #ffd600; color: #ffd600; margin-left: auto; }
+  button#btn-generate:hover:not(:disabled) { background: #f9a825; color: #000; border-color: #ffd600; }
 
-  .book-row .range-sep {
-    font-size: 0.8rem;
-    color: #333;
-    padding: 0 2px;
-  }
-
-  .book-row .range-label {
-    font-size: 0.78rem;
-    color: #3a3a3a;
-    letter-spacing: 0.05em;
-    white-space: nowrap;
-  }
-
-  .book-row input.inp-clue {
-    width: 52px;
-  }
-
-  .book-row input.inp-clue.error {
-    border-color: #f44336;
-    background: #1a0505;
-    color: #ff8a80;
-  }
-
-  .book-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-    border-top: 1px solid #1e1e1e;
-    padding-top: 14px;
-  }
-
-  #book-total-label {
-    font-family: var(--ui-font);
+  /* ── Status ── */
+  #status {
     font-size: 0.85rem;
     letter-spacing: 0.08em;
-    color: #666;
-  }
-  #book-total-label span { color: #ffd600; }
-
-  button#btn-batch {
-    border-color: #ffd600; color: #ffd600;
-  }
-  button#btn-batch:hover { background: #f9a825; color: #000; border-color: #ffd600; }
-  button#btn-batch:disabled { opacity: 0.35; cursor: default; }
-
-  /* ── Progress bar ── */
-  #batch-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    max-width: 640px;
-  }
-  #batch-bar-track {
-    width: 100%;
-    height: 5px;
-    background: #1a1a1a;
-    border: 1px solid #2a2a2a;
-    display: none;
-  }
-  #batch-bar-fill {
-    height: 100%;
-    width: 0%;
-    background: #ffd600;
-    transition: width 0.1s linear;
-  }
-  #batch-detail {
-    font-family: var(--ui-font);
-    font-size: 0.75rem;
-    letter-spacing: 0.08em;
-    color: #555;
-    min-height: 1em;
+    color: #888;
+    min-height: 1.2em;
     text-align: center;
   }
+  #status.ok   { color: #4caf50; }
+  #status.fail { color: #f44336; }
 
-  /* ── Grid previews ── */
-  #grid-container {
-    display: flex;
-    gap: 48px;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: flex-start;
+  /* ── Play area ── */
+  #play-area { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+  #board {
+    width: var(--board);
+    height: var(--board);
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    border: 4px solid #0a0a0a;
+    background: #fff;
+    outline: none;
+    touch-action: manipulation;
   }
-  .grid-wrap {
+  .cell {
+    position: relative;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    border-right: 1px solid #0a0a0a;
+    border-bottom: 1px solid #0a0a0a;
+    background: #fff;
+    color: #0a0a0a;
+    font-size: calc(var(--board) * 0.062);
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  .grid-label {
+  .cell.box-r { border-right-width: 3px; }
+  .cell.box-b { border-bottom-width: 3px; }
+  .cell.edge-r { border-right: none; }
+  .cell.edge-b { border-bottom: none; }
+  .cell.peer  { background: #efefef; }
+  .cell.same  { background: #fff1a8; }
+  .cell.wrong { background: #fde0e0; color: #d32f2f; }
+  .cell.sel   { background: #ffe14d; }
+  .cell.user  { color: #1f4e9c; }
+  .cell.user.wrong { color: #d32f2f; }
+  .notes {
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    font-size: calc(var(--board) * 0.024);
+    color: #555;
+  }
+  .notes span { display: flex; align-items: center; justify-content: center; }
+
+  /* ── Number pad + tools ── */
+  .pad { width: var(--board); display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; }
+  .pad button { padding: 10px 0; font-size: 1.2rem; letter-spacing: 0; }
+  .tools { width: var(--board); display: flex; gap: 8px; }
+  .tools button { flex: 1; padding: 10px 6px; font-size: 0.85rem; }
+  .tools button[aria-pressed="true"] { border-color: #ffd600; color: #ffd600; }
+
+  .secondary-row { width: var(--board); display: flex; gap: 8px; flex-wrap: wrap; }
+  .secondary-row button { flex: 1; padding: 10px 6px; font-size: 0.85rem; border-color: #546e7a; color: #78909c; }
+  .secondary-row button:hover { background: #263238; color: #cfd8dc; border-color: #90a4ae; }
+
+  #solution-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .grid-label { font-size: 0.8rem; letter-spacing: 0.15em; color: #666; text-transform: uppercase; }
+  svg.sudoku-svg { width: var(--board); height: var(--board); }
+  svg.sudoku-svg text.given, svg.sudoku-svg text.solution {
     font-family: var(--ui-font);
-    font-size: 0.9rem;
-    letter-spacing: 0.15em;
-    color: #666;
-    text-transform: uppercase;
-  }
-  svg.sudoku-svg {
-    width: 420px;
-    height: 420px;
-    max-width: 90vw;
-    max-height: 90vw;
-  }
-  svg.sudoku-svg text.given {
-    fill: #0a0a0a;
-    font-family: var(--puzzle-font);
     font-size: 38px;
     dominant-baseline: central;
     text-anchor: middle;
   }
-  svg.sudoku-svg text.solution {
-    fill: #cc2020;
-    font-family: var(--puzzle-font);
-    font-size: 38px;
-    dominant-baseline: central;
-    text-anchor: middle;
-  }
+  svg.sudoku-svg text.given    { fill: #0a0a0a; }
+  svg.sudoku-svg text.solution { fill: #cc2020; }
 </style>
 </head>
 <body>
 
 <nav class="tabnav">
-  <a href="index.html" class="active">Sudoku Generator</a>
+  <a href="index.html" class="active">Play Sudoku</a>
   <a href="book-builder.html">Book Builder</a>
   <a href="page-calculator.html">Page Calculator</a>
 </nav>
 
-<h1>Sudoku Generator</h1>
+<h1>Play Sudoku</h1>
 
-<!-- ── Difficulty / single-puzzle controls ── -->
-<div class="controls">
-  <button id="btn-easy"    onclick="generate('easy')">Easy</button>
-  <button id="btn-medium"  onclick="generate('medium')">Medium</button>
-  <button id="btn-hard"    onclick="generate('hard')">Hard</button>
-  <button id="btn-extreme" onclick="generate('extreme')">Extreme</button>
-  <button id="btn-surreal" onclick="generate('surreal')">Master</button>
-
-  <select id="select-outline" onchange="changeOutline()" title="Grid outline style">
-    <option value="bold">Outline: Bold</option>
-    <option value="thin">Outline: Thin</option>
-  </select>
-
-  <div class="font-row">
-    <select id="select-font" onchange="changeFont()" aria-label="Puzzle font">
-      <option value="0">Font: DIN</option>
-      <option value="1">Font: Surreal</option>
-      <option value="2">Font: Vincendo</option>
-      <option value="3">Font: Inter</option>
-      <option value="4">Font: Aileron</option>
+<!-- ── Difficulty ── -->
+<div id="setup-panel">
+  <div class="panel-title">Select your difficulty <button id="btn-comp-reset" title="Restore the default difficulty and clue ranges">↺ Reset</button></div>
+  <div class="setup-row">
+    <select id="difficulty" aria-label="Difficulty">
+      <option value="easy" selected>Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+      <option value="extreme">Extreme</option>
+      <option value="surreal">Master</option>
     </select>
-    <button class="btn-icon" title="Add font from file" onclick="triggerAddFont()">＋</button>
-    <button class="btn-icon" id="btn-remove-font" title="Remove selected custom font" onclick="removeCurrentFont()" disabled>✕</button>
-    <input type="file" id="font-file-input" accept=".ttf,.otf,.woff,.woff2" style="display:none" onchange="addFontFromFile(event)">
-  </div>
-
-  <button id="btn-download" onclick="downloadSingle()" disabled>Download SVGs</button>
-  <button id="btn-blank" onclick="downloadBlankGrid()">Download Blank Grid</button>
-</div>
-
-<div id="status">Select a difficulty to generate a puzzle.</div>
-
-<!-- ── Book composition panel ── -->
-<div id="book-panel">
-  <div class="book-panel-title">Book Composition <button id="btn-comp-reset" title="Restore the default counts, clue ranges and PNG resolution">↺ Reset</button></div>
-  <div class="book-rows">
-
-    <div class="book-row">
-      <label class="lbl-easy" for="inp-easy">Easy</label>
-      <input type="number" id="inp-easy" aria-label="Easy puzzle count" value="18" min="0" max="999" oninput="updateTotal()">
-      <span class="puzz-count" id="pc-easy">18 puzzles</span>
+    <div class="clue-row" data-diff="easy">
       <span class="range-label">clues:</span>
-      <input type="number" class="inp-clue" id="cr-easy-min" aria-label="Easy minimum clues" value="37" min="17" max="80" oninput="updateClueRange('easy')">
+      <input type="number" id="cr-easy-min" aria-label="Easy minimum clues" value="37" min="17" max="80" oninput="updateClueRange('easy')">
       <span class="range-sep">–</span>
-      <input type="number" class="inp-clue" id="cr-easy-max" aria-label="Easy maximum clues" value="39" min="17" max="80" oninput="updateClueRange('easy')">
+      <input type="number" id="cr-easy-max" aria-label="Easy maximum clues" value="39" min="17" max="80" oninput="updateClueRange('easy')">
     </div>
-
-    <div class="book-row">
-      <label class="lbl-medium" for="inp-medium">Medium</label>
-      <input type="number" id="inp-medium" aria-label="Medium puzzle count" value="42" min="0" max="999" oninput="updateTotal()">
-      <span class="puzz-count" id="pc-medium">42 puzzles</span>
+    <div class="clue-row" data-diff="medium" hidden>
       <span class="range-label">clues:</span>
-      <input type="number" class="inp-clue" id="cr-medium-min" aria-label="Medium minimum clues" value="34" min="17" max="80" oninput="updateClueRange('medium')">
+      <input type="number" id="cr-medium-min" aria-label="Medium minimum clues" value="34" min="17" max="80" oninput="updateClueRange('medium')">
       <span class="range-sep">–</span>
-      <input type="number" class="inp-clue" id="cr-medium-max" aria-label="Medium maximum clues" value="36" min="17" max="80" oninput="updateClueRange('medium')">
+      <input type="number" id="cr-medium-max" aria-label="Medium maximum clues" value="36" min="17" max="80" oninput="updateClueRange('medium')">
     </div>
-
-    <div class="book-row">
-      <label class="lbl-hard" for="inp-hard">Hard</label>
-      <input type="number" id="inp-hard" aria-label="Hard puzzle count" value="34" min="0" max="999" oninput="updateTotal()">
-      <span class="puzz-count" id="pc-hard">34 puzzles</span>
+    <div class="clue-row" data-diff="hard" hidden>
       <span class="range-label">clues:</span>
-      <input type="number" class="inp-clue" id="cr-hard-min" aria-label="Hard minimum clues" value="29" min="17" max="80" oninput="updateClueRange('hard')">
+      <input type="number" id="cr-hard-min" aria-label="Hard minimum clues" value="29" min="17" max="80" oninput="updateClueRange('hard')">
       <span class="range-sep">–</span>
-      <input type="number" class="inp-clue" id="cr-hard-max" aria-label="Hard maximum clues" value="32" min="17" max="80" oninput="updateClueRange('hard')">
+      <input type="number" id="cr-hard-max" aria-label="Hard maximum clues" value="32" min="17" max="80" oninput="updateClueRange('hard')">
     </div>
-
-    <div class="book-row">
-      <label class="lbl-extreme" for="inp-extreme">Extreme</label>
-      <input type="number" id="inp-extreme" aria-label="Extreme puzzle count" value="26" min="0" max="999" oninput="updateTotal()">
-      <span class="puzz-count" id="pc-extreme">26 puzzles</span>
+    <div class="clue-row" data-diff="extreme" hidden>
       <span class="range-label">clues:</span>
-      <input type="number" class="inp-clue" id="cr-extreme-min" aria-label="Extreme minimum clues" value="26" min="17" max="80" oninput="updateClueRange('extreme')">
+      <input type="number" id="cr-extreme-min" aria-label="Extreme minimum clues" value="26" min="17" max="80" oninput="updateClueRange('extreme')">
       <span class="range-sep">–</span>
-      <input type="number" class="inp-clue" id="cr-extreme-max" aria-label="Extreme maximum clues" value="28" min="17" max="80" oninput="updateClueRange('extreme')">
+      <input type="number" id="cr-extreme-max" aria-label="Extreme maximum clues" value="28" min="17" max="80" oninput="updateClueRange('extreme')">
     </div>
-
-    <div class="book-row">
-      <label class="lbl-surreal" for="inp-surreal">Master</label>
-      <input type="number" id="inp-surreal" aria-label="Master puzzle count" value="22" min="0" max="999" oninput="updateTotal()">
-      <span class="puzz-count" id="pc-surreal">22 puzzles</span>
+    <div class="clue-row" data-diff="surreal" hidden>
       <span class="range-label">clues:</span>
-      <input type="number" class="inp-clue" id="cr-surreal-min" aria-label="Master minimum clues" value="23" min="17" max="80" oninput="updateClueRange('surreal')">
+      <input type="number" id="cr-surreal-min" aria-label="Master minimum clues" value="23" min="17" max="80" oninput="updateClueRange('surreal')">
       <span class="range-sep">–</span>
-      <input type="number" class="inp-clue" id="cr-surreal-max" aria-label="Master maximum clues" value="25" min="17" max="80" oninput="updateClueRange('surreal')">
+      <input type="number" id="cr-surreal-max" aria-label="Master maximum clues" value="25" min="17" max="80" oninput="updateClueRange('surreal')">
     </div>
-
-  </div>
-  <div class="book-footer">
-    <div style="display:flex;flex-direction:column;gap:8px;min-width:0;">
-      <div id="book-total-label">Total: <span id="book-total">142</span> puzzles · <span id="book-files">568</span> files (SVG + PNG each)</div>
-      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;">
-        <span style="font-size:0.8rem;letter-spacing:0.08em;color:#555;">PNG resolution</span>
-        <select id="select-scale" aria-label="PNG resolution" style="font-family:var(--ui-font);font-size:0.85rem;padding:5px 10px;border:1px solid #333;background:#111;color:#aaa;outline:none;max-width:100%;">
-          <option value="2">2× — 1080px (~72 DPI print)</option>
-          <option value="3" selected>3× — 1620px (~300 DPI print)</option>
-          <option value="4">4× — 2160px (~400 DPI print)</option>
-        </select>
-      </div>
-    </div>
-    <button id="btn-batch" onclick="generateBook()">Generate Full Book</button>
+    <button id="btn-generate">Generate Puzzle</button>
   </div>
 </div>
 
-<!-- ── Progress ── -->
-<div id="batch-wrap">
-  <div id="batch-bar-track"><div id="batch-bar-fill"></div></div>
-  <div id="batch-detail"></div>
-</div>
+<div id="status" role="status" aria-live="polite"></div>
 
-<!-- ── Grid previews ── -->
-<div id="grid-container">
-  <div class="grid-wrap">
-    <div class="grid-label">Puzzle</div>
-    <svg id="svg-puzzle" class="sudoku-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540"></svg>
+<!-- ── Play ── -->
+<div id="play-area">
+  <div id="board" role="grid" tabindex="0" aria-label="Sudoku board. Arrow keys move, 1 to 9 enter a number, Shift plus a number or N for pencil marks, Backspace erases, Control Z undoes."></div>
+
+  <div class="pad" id="pad">
+    <button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button>
+    <button data-n="4">4</button><button data-n="5">5</button><button data-n="6">6</button>
+    <button data-n="7">7</button><button data-n="8">8</button><button data-n="9">9</button>
   </div>
-  <div class="grid-wrap">
+  <div class="tools">
+    <button id="btn-pencil" aria-pressed="false" title="Pencil marks (N)">✎ Pencil</button>
+    <button id="btn-erase" title="Erase (Backspace)">⌫ Erase</button>
+    <button id="btn-undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+  </div>
+
+  <div class="secondary-row">
+    <button id="btn-solution" aria-expanded="false" aria-controls="solution-wrap">Show solution</button>
+    <button id="btn-blank">Download Blank Grid</button>
+  </div>
+
+  <div id="solution-wrap" hidden>
     <div class="grid-label">Solution</div>
     <svg id="svg-solution" class="sudoku-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540"></svg>
   </div>
@@ -515,12 +321,12 @@
 
 <script>
 // ═══════════════════════════════════════════════════════
-// GRID SVG TEMPLATE
+// GRID SVG TEMPLATE (solution view + blank-grid download)
 // ═══════════════════════════════════════════════════════
 // Grid: 9×9 cells of 60px = 540×540. Origin at (0,0). No margins.
 // Thin cell lines: 60,120 | 240,300 | 420,480
 // Thick box lines: 0,180,360,540
-// Inner grid (every style): white bg, thin cell lines (1.5), thick 3×3 dividers (4).
+// Inner grid: white bg, thin cell lines (1.5), thick 3×3 dividers (4).
 const GRID_INNER = `
   <rect x="0" y="0" width="540" height="540" fill="#ffffff"/>
   <line x1="0" y1="60"  x2="540" y2="60"  stroke="#0a0a0a" stroke-width="1.5" stroke-linecap="square"/>
@@ -540,17 +346,9 @@ const GRID_INNER = `
   <line x1="0" y1="360" x2="540" y2="360" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
   <line x1="360" y1="0" x2="360" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
 `;
-// Outer frame: 'bold' = full 4px (inset rect, matches inner dividers);
-// 'thin' = classic edge lines that render ~2px (half clipped by the viewBox).
+// Outer frame: full 4px (inset rect, matches the inner 3×3 dividers).
 const GRID_OUTER_BOLD = `<rect x="2" y="2" width="536" height="536" fill="none" stroke="#0a0a0a" stroke-width="4.0" stroke-linejoin="miter"/>`;
-const GRID_OUTER_THIN = `
-  <line x1="0" y1="0"   x2="540" y2="0"   stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-  <line x1="0" y1="0"   x2="0"   y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-  <line x1="0" y1="540" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-  <line x1="540" y1="0" x2="540" y2="540" stroke="#0a0a0a" stroke-width="4.0" stroke-linecap="square"/>
-`;
-let outlineStyle = 'bold';
-function gridMarkup() { return GRID_INNER + (outlineStyle === 'thin' ? GRID_OUTER_THIN : GRID_OUTER_BOLD); }
+function gridMarkup() { return GRID_INNER + GRID_OUTER_BOLD; }
 
 // Cell centre: x = 30 + col*60,  y = 30 + row*60
 function cellX(col) { return 30 + col * 60; }
@@ -737,182 +535,192 @@ function generatePuzzle(difficulty) {
 }
 
 // ═══════════════════════════════════════════════════════
-// FONT SYSTEM
+// PLAY STATE
+// Cells are indexed 0..80 (row-major). notes[i] is a bitmask: bit n = candidate n.
 // ═══════════════════════════════════════════════════════
-const FONTS = [
-  { name: 'DIN',      family: "'DIN', sans-serif",      src: 'Fonts/din-1451-fette-breitschrift-1936/DIN1451-36breit.ttf' },
-  { name: 'Surreal',  family: "'Surreal', sans-serif",  src: 'Fonts/surreal-psychedelic-typeface/Surreal.ttf' },
-  { name: 'Vincendo', family: "'Vincendo', sans-serif", src: 'Fonts/vincendo/Vincendo-Regular.ttf' },
-  { name: 'Inter',    family: "'Inter', sans-serif",    src: 'Fonts/inter/Inter_24pt-Medium.ttf' },
-  { name: 'Aileron',  family: "'Aileron', sans-serif",  src: 'Fonts/aileron/Aileron-SemiBold.otf' },
-];
-let fontIndex = 0;
-// Cache for base64-encoded font data URIs (used in standalone SVG exports)
-const fontB64Cache = {};
+const $ = id => document.getElementById(id);
+const rowOf = i => (i / 9) | 0, colOf = i => i % 9, boxOfIdx = i => boxOf(rowOf(i), colOf(i));
+const PEERS = Array.from({ length: 81 }, (_, i) => {
+  const out = [];
+  for (let j = 0; j < 81; j++)
+    if (j !== i && (rowOf(j) === rowOf(i) || colOf(j) === colOf(i) || boxOfIdx(j) === boxOfIdx(i))) out.push(j);
+  return out;
+});
 
-async function fetchFontB64(fontObj) {
-  if (fontB64Cache[fontObj.name]) return fontB64Cache[fontObj.name];
-  // Custom or pre-embedded fonts already carry their data URI directly
-  if (fontObj.dataUri) {
-    fontB64Cache[fontObj.name] = fontObj.dataUri;
-    return fontObj.dataUri;
+const play = { puzzle: null, solution: null, grid: new Array(81).fill(0), notes: new Array(81).fill(0), sel: -1, pencil: false, history: [], solved: false, difficulty: null };
+
+function setStatus(msg, cls = '') {
+  const el = $('status');
+  el.textContent = msg;
+  el.className = cls;
+}
+
+function startGame(puzzle, solution, difficulty) {
+  play.puzzle = puzzle.flat();
+  play.solution = solution.flat();
+  play.grid = [...play.puzzle];
+  play.notes = new Array(81).fill(0);
+  play.sel = play.puzzle.findIndex(v => v === 0);
+  play.history = [];
+  play.solved = false;
+  play.difficulty = difficulty;
+  renderToSVGElement($('svg-solution'), puzzle, solution, true);
+  setSolutionVisible(false);
+  renderBoard();
+}
+
+function snapshot() {
+  play.history.push({ g: [...play.grid], n: [...play.notes] });
+  if (play.history.length > 500) play.history.shift();
+}
+
+function editable(i) { return i >= 0 && !play.solved && play.puzzle && play.puzzle[i] === 0; }
+
+function placeNumber(n, asNote) {
+  const i = play.sel;
+  if (!editable(i)) return;
+  if (asNote) {
+    if (play.grid[i] !== 0) return;               // pencil marks only in empty cells
+    snapshot();
+    play.notes[i] ^= (1 << n);
+  } else {
+    if (play.grid[i] === n) return;
+    snapshot();
+    play.grid[i] = n;
+    play.notes[i] = 0;
+    for (const p of PEERS[i]) play.notes[p] &= ~(1 << n);   // clear this candidate from row/column/box
   }
-  const resp = await fetch(fontObj.src);
-  const bytes = new Uint8Array(await resp.arrayBuffer());
-  // Chunked: spreading a large font (e.g. Inter, ~340 KB) into one call overflows the stack.
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  const b64  = btoa(bin);
-  const uri  = `data:font/truetype;base64,${b64}`;
-  fontB64Cache[fontObj.name] = uri;
-  return uri;
+  afterChange();
 }
 
-// Pre-load built-in fonts in the background on startup
-function prefetchFonts() {
-  FONTS.forEach(f => { if (f.src) fetchFontB64(f).catch(() => {}); });
+function erase() {
+  const i = play.sel;
+  if (!editable(i) || (play.grid[i] === 0 && play.notes[i] === 0)) return;
+  snapshot();
+  play.grid[i] = 0;
+  play.notes[i] = 0;
+  afterChange();
 }
 
-// ─── Apply font by index ───────────────────────────────
-function applyFont(idx) {
-  fontIndex = idx;
-  const f = FONTS[fontIndex];
-  document.documentElement.style.setProperty('--puzzle-font', f.family);
-  // Custom fonts are already base64 in the cache via their dataUri
-  if (f.dataUri) fontB64Cache[f.name] = f.dataUri;
-  if (state.puzzle) {
-    renderToSVGElement(document.getElementById('svg-puzzle'),   state.puzzle, state.solution, false);
-    renderToSVGElement(document.getElementById('svg-solution'), state.puzzle, state.solution, true);
+function undo() {
+  if (play.solved || !play.history.length) return;
+  const s = play.history.pop();
+  play.grid = s.g;
+  play.notes = s.n;
+  afterChange();
+}
+
+function afterChange() {
+  if (play.grid.every((v, k) => v === play.solution[k])) {
+    play.solved = true;
+    setStatus(`Solved ✓ — nicely done! (${diffLabel(play.difficulty)})`, 'ok');
   }
-  savePicks();
+  renderBoard();
 }
 
-function changeFont() {
-  const idx = parseInt(document.getElementById('select-font').value, 10);
-  applyFont(idx);
-  // Show remove button only for custom fonts (index >= BUILTIN_FONT_COUNT)
-  document.getElementById('btn-remove-font').disabled = idx < BUILTIN_FONT_COUNT;
+function togglePencil(force) {
+  play.pencil = typeof force === 'boolean' ? force : !play.pencil;
+  $('btn-pencil').setAttribute('aria-pressed', String(play.pencil));
 }
 
-function changeOutline() {
-  outlineStyle = document.getElementById('select-outline').value;
-  if (state.puzzle) {
-    renderToSVGElement(document.getElementById('svg-puzzle'),   state.puzzle, state.solution, false);
-    renderToSVGElement(document.getElementById('svg-solution'), state.puzzle, state.solution, true);
-  }
-  savePicks();
-}
-
-// ── Persistence: remember the puzzle font + grid outline picks.
-//    Font is stored by NAME — custom-font indices shift when one is removed. ──
-const PICKS_KEY = 'sudoku_generator_picks_v1';
-function savePicks() {
-  try { localStorage.setItem(PICKS_KEY, JSON.stringify({ font: FONTS[fontIndex].name, outline: outlineStyle })); }
-  catch (e) { /* storage unavailable — picks just won't be remembered */ }
-}
-function loadPicks() {
-  try {
-    const p = JSON.parse(localStorage.getItem(PICKS_KEY) || 'null');
-    if (!p) return;
-    const i = FONTS.findIndex(f => f.name === p.font);          // gone (e.g. custom font removed) → stay on DIN
-    if (i >= 0) { document.getElementById('select-font').value = i; changeFont(); }
-    const sel = document.getElementById('select-outline');
-    if ([...sel.options].some(o => o.value === p.outline)) { sel.value = p.outline; changeOutline(); }
-  } catch (e) { /* corrupt — keep the defaults */ }
-}
-
-// ─── Font manager ──────────────────────────────────────
-const BUILTIN_FONT_COUNT = FONTS.length; // set once, never changes
-const CUSTOM_FONTS_KEY   = 'sudoku_custom_fonts';
-
-function rebuildFontDropdown() {
-  const sel = document.getElementById('select-font');
-  sel.innerHTML = '';
-  FONTS.forEach((f, i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = (i >= BUILTIN_FONT_COUNT ? '★ ' : '') + 'Font: ' + f.name;
-    sel.appendChild(opt);
-  });
-  sel.value = fontIndex;
-}
-
-function registerFontFace(name, dataUri) {
-  // Inject @font-face into the page so the font renders in SVG previews
-  const style = document.createElement('style');
-  style.textContent = `@font-face { font-family: '${name}'; src: url('${dataUri}') format('truetype'); }`;
-  document.head.appendChild(style);
-}
-
-function saveCustomFonts() {
-  const custom = FONTS.slice(BUILTIN_FONT_COUNT).map(f => ({
-    name: f.name, family: f.family, dataUri: f.dataUri,
-  }));
-  localStorage.setItem(CUSTOM_FONTS_KEY, JSON.stringify(custom));
-}
-
-function loadCustomFonts() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(CUSTOM_FONTS_KEY) || '[]');
-    saved.forEach(f => {
-      FONTS.push({ name: f.name, family: `'${f.name}', sans-serif`, dataUri: f.dataUri });
-      fontB64Cache[f.name] = f.dataUri;
-      registerFontFace(f.name, f.dataUri);
-    });
-    if (saved.length) rebuildFontDropdown();
-  } catch(e) {}
-}
-
-function triggerAddFont() {
-  document.getElementById('font-file-input').value = '';
-  document.getElementById('font-file-input').click();
-}
-
-function addFontFromFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  // Derive a default name from the filename (strip extension)
-  const defaultName = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-  const name = (prompt('Font display name:', defaultName) || '').trim();
-  if (!name) return;
-
-  const reader = new FileReader();
-  reader.onload = e => {
-    const dataUri = e.target.result; // already a data URI from readAsDataURL
-    // Register in page
-    registerFontFace(name, dataUri);
-    // Add to FONTS array and cache
-    FONTS.push({ name, family: `'${name}', sans-serif`, dataUri });
-    fontB64Cache[name] = dataUri;
-    // Save to localStorage
-    saveCustomFonts();
-    // Update dropdown and select the new font
-    rebuildFontDropdown();
-    const newIdx = FONTS.length - 1;
-    document.getElementById('select-font').value = newIdx;
-    applyFont(newIdx);
-    document.getElementById('btn-remove-font').disabled = false;
-  };
-  reader.readAsDataURL(file);
-}
-
-function removeCurrentFont() {
-  if (fontIndex < BUILTIN_FONT_COUNT) return;
-  const name = FONTS[fontIndex].name;
-  if (!confirm(`Remove font "${name}"?`)) return;
-  FONTS.splice(fontIndex, 1);
-  delete fontB64Cache[name];
-  saveCustomFonts();
-  const newIdx = Math.min(fontIndex, FONTS.length - 1);
-  rebuildFontDropdown();
-  document.getElementById('select-font').value = newIdx;
-  applyFont(newIdx);
-  document.getElementById('btn-remove-font').disabled = newIdx < BUILTIN_FONT_COUNT;
+function moveSel(dr, dc) {
+  if (play.sel < 0) { play.sel = 0; renderBoard(); return; }
+  const r = (rowOf(play.sel) + dr + 9) % 9, c = (colOf(play.sel) + dc + 9) % 9;
+  play.sel = r * 9 + c;
+  renderBoard();
 }
 
 // ═══════════════════════════════════════════════════════
-// SVG RENDERING
+// BOARD RENDERING
+// ═══════════════════════════════════════════════════════
+function renderBoard() {
+  const sel = play.sel, selVal = sel >= 0 ? play.grid[sel] : 0;
+  const peerSet = new Set(sel >= 0 ? PEERS[sel] : []);
+  let html = '';
+  for (let i = 0; i < 81; i++) {
+    const r = rowOf(i), c = colOf(i), v = play.grid[i];
+    const given = play.puzzle && play.puzzle[i] !== 0;
+    const wrong = !given && v !== 0 && v !== play.solution[i];
+    const cls = ['cell'];
+    if (c === 2 || c === 5) cls.push('box-r');
+    if (r === 2 || r === 5) cls.push('box-b');
+    if (c === 8) cls.push('edge-r');
+    if (r === 8) cls.push('edge-b');
+    if (v !== 0 && !given) cls.push('user');
+    if (peerSet.has(i)) cls.push('peer');
+    if (selVal && v === selVal) cls.push('same');
+    if (wrong) cls.push('wrong');
+    if (i === sel) cls.push('sel');
+
+    let inner = '';
+    if (v) inner = String(v);
+    else if (play.notes[i]) {
+      inner = '<div class="notes">';
+      for (let n = 1; n <= 9; n++) inner += `<span>${play.notes[i] & (1 << n) ? n : ''}</span>`;
+      inner += '</div>';
+    }
+    let label = `Row ${r + 1}, column ${c + 1}, `;
+    if (v) label += v + (given ? ', given' : '') + (wrong ? ', incorrect' : '');
+    else {
+      const ns = [1,2,3,4,5,6,7,8,9].filter(n => play.notes[i] & (1 << n));
+      label += ns.length ? 'pencil marks ' + ns.join(' ') : 'empty';
+    }
+    html += `<div class="${cls.join(' ')}" role="gridcell" data-i="${i}" aria-label="${label}"${i === sel ? ' aria-selected="true"' : ''}>${inner}</div>`;
+  }
+  $('board').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+// INPUT
+// ═══════════════════════════════════════════════════════
+$('board').addEventListener('click', e => {
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  play.sel = +cell.dataset.i;
+  renderBoard();
+  $('board').focus({ preventScroll: true });
+});
+
+$('pad').addEventListener('click', e => {
+  const b = e.target.closest('button[data-n]');
+  if (b) placeNumber(+b.dataset.n, play.pencil);
+});
+$('btn-pencil').addEventListener('click', () => togglePencil());
+$('btn-erase').addEventListener('click', erase);
+$('btn-undo').addEventListener('click', undo);
+
+document.addEventListener('keydown', e => {
+  if (!play.puzzle) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+  if (e.altKey) return;
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); return; }
+  if (e.ctrlKey || e.metaKey) return;
+
+  const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
+  if (m) { e.preventDefault(); placeNumber(+m[1], play.pencil !== e.shiftKey); return; }
+  switch (e.key) {
+    case 'Backspace': case 'Delete': case '0': e.preventDefault(); erase(); break;
+    case 'ArrowUp':    e.preventDefault(); moveSel(-1, 0); break;
+    case 'ArrowDown':  e.preventDefault(); moveSel(1, 0);  break;
+    case 'ArrowLeft':  e.preventDefault(); moveSel(0, -1); break;
+    case 'ArrowRight': e.preventDefault(); moveSel(0, 1);  break;
+    case 'n': case 'N': togglePencil(); break;
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// SOLUTION TOGGLE
+// ═══════════════════════════════════════════════════════
+function setSolutionVisible(show) {
+  $('solution-wrap').hidden = !show;
+  $('btn-solution').setAttribute('aria-expanded', String(show));
+  $('btn-solution').textContent = show ? 'Hide solution' : 'Show solution';
+}
+$('btn-solution').addEventListener('click', () => setSolutionVisible($('solution-wrap').hidden));
+
+// ═══════════════════════════════════════════════════════
+// SVG RENDERING (solution view)
 // ═══════════════════════════════════════════════════════
 function buildSVGContent(puzzle, solution, showSolution) {
   let texts = '';
@@ -930,147 +738,72 @@ function buildSVGContent(puzzle, solution, showSolution) {
   return texts;
 }
 
-async function buildStandaloneSVG(puzzle, solution, showSolution) {
-  const f      = FONTS[fontIndex];
-  const srcUri = await fetchFontB64(f);   // embedded — no external dependency
-  const styleBlock = `<defs><style>
-    @font-face {
-      font-family: '${f.name}';
-      src: url('${srcUri}') format('truetype');
-    }
-    text.given {
-      fill: #0a0a0a;
-      font-family: ${f.family};
-      font-size: 38px;
-      dominant-baseline: central;
-      text-anchor: middle;
-    }
-    text.solution {
-      fill: #cc2020;
-      font-family: ${f.family};
-      font-size: 38px;
-      dominant-baseline: central;
-      text-anchor: middle;
-    }
-  </style></defs>`;
-  const texts = buildSVGContent(puzzle, solution, showSolution);
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540">
-${styleBlock}
-${gridMarkup()}
-${texts}
-</svg>`;
-}
-
 function renderToSVGElement(svgEl, puzzle, solution, showSolution) {
   svgEl.innerHTML = gridMarkup() + buildSVGContent(puzzle, solution, showSolution);
 }
 
 // ═══════════════════════════════════════════════════════
-// STATE + SINGLE-PUZZLE CONTROLS
+// GENERATE
 // ═══════════════════════════════════════════════════════
-let state = { puzzle: null, solution: null, difficulty: null };
+const diffLabel = k => { const n = diffName(k); return n.charAt(0).toUpperCase() + n.slice(1); };
 
-function setStatus(msg, cls='') {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = cls;
-}
-
-function generate(difficulty) {
-  // Validate range first — mark red and abort if broken
+function generate() {
+  const difficulty = $('difficulty').value;
   if (!validateRange(difficulty)) {
-    const [mn, mx] = CLUE_RANGES[difficulty];
     setStatus(`Invalid clue range for ${diffName(difficulty)} — min must be ≤ max, between 17 and 80.`, 'fail');
     return;
   }
-
-  ['easy','medium','hard','extreme','surreal'].forEach(d =>
-    document.getElementById('btn-'+d).classList.toggle('active', d === difficulty)
-  );
-  document.getElementById('btn-download').disabled = true;
-  setStatus('Generating ' + diffName(difficulty) + ' puzzle…');
+  $('btn-generate').disabled = true;
+  setStatus(`Generating ${diffName(difficulty)} puzzle…`);
   setTimeout(() => {
     try {
-      const result = generatePuzzleInRange(difficulty);
-      if (!result) {
-        const [mn, mx] = CLUE_RANGES[difficulty];
-        setStatus(`Could not reach ${mn}–${mx} clues for ${diffName(difficulty)} in 30 attempts. Try widening the range.`, 'fail');
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const result = generatePuzzleInRange(difficulty);
+        if (!result) {
+          const [mn, mx] = CLUE_RANGES[difficulty];
+          setStatus(`Could not reach ${mn}–${mx} clues for ${diffName(difficulty)} in 30 attempts. Try widening the range.`, 'fail');
+          return;
+        }
+        const { puzzle, solution } = result;
+        const check = solve(puzzle);
+        if (!check || check.some((row, r) => row.some((v, c) => v !== solution[r][c]))) continue;
+        startGame(puzzle, solution, difficulty);
+        const clues = puzzle.flat().filter(v => v !== 0).length;
+        setStatus(`${diffLabel(difficulty)} · ${clues} clues — good luck!`);
         return;
       }
-      const { puzzle, solution } = result;
-      const check = solve(puzzle);
-      if (!check) { setStatus('Generation failed — retry.', 'fail'); return; }
-      let match = true;
-      outer: for (let r = 0; r < 9; r++)
-        for (let c = 0; c < 9; c++)
-          if (check[r][c] !== solution[r][c]) { match = false; break outer; }
-      if (!match) { generate(difficulty); return; }
-      state = { puzzle, solution, difficulty };
-      const clues = puzzle.flat().filter(v => v !== 0).length;
-      setStatus(`${diffName(difficulty).charAt(0).toUpperCase()+diffName(difficulty).slice(1)} — ${clues} clues — Solver verified ✓`, 'ok');
-      renderToSVGElement(document.getElementById('svg-puzzle'),   puzzle, solution, false);
-      renderToSVGElement(document.getElementById('svg-solution'), puzzle, solution, true);
-      document.getElementById('btn-download').disabled = false;
-    } catch(e) { setStatus('Error: ' + e.message, 'fail'); }
+      setStatus('Generation failed — try again.', 'fail');
+    } catch (e) {
+      setStatus('Error: ' + e.message, 'fail');
+    } finally {
+      $('btn-generate').disabled = false;
+    }
   }, 10);
 }
+$('btn-generate').addEventListener('click', generate);
 
 // ═══════════════════════════════════════════════════════
-// BOOK COMPOSITION UI
-// ═══════════════════════════════════════════════════════
-function updateTotal() {
-  const diffs = ['easy','medium','hard','extreme','surreal'];
-  let total = 0;
-  for (const d of diffs) {
-    const v = parseInt(document.getElementById('inp-'+d).value, 10) || 0;
-    total += v;
-    document.getElementById('pc-'+d).textContent = v + ' puzzle' + (v === 1 ? '' : 's');
-  }
-  document.getElementById('book-total').textContent = total;
-  document.getElementById('book-files').textContent  = total * 4; // SVG+PNG per puzzle+solution
-}
-
-function getBookPlan() {
-  return ['easy','medium','hard','extreme','surreal'].map(d => ({
-    difficulty: d,
-    count: Math.max(0, parseInt(document.getElementById('inp-'+d).value, 10) || 0),
-  })).filter(d => d.count > 0);
-}
-
-// ═══════════════════════════════════════════════════════
-// SVG → PNG via canvas
+// BLANK GRID DOWNLOAD (SVG + PNG in a zip)
 // ═══════════════════════════════════════════════════════
 function svgToPng(svgString, scale) {
   return new Promise((resolve, reject) => {
     const size = 540 * scale;
     const canvas = document.createElement('canvas');
-    canvas.width  = size;
+    canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
-    const blob = new Blob([svgString], { type: 'image/svg+xml' });
-    const url  = URL.createObjectURL(blob);
-    const img  = new Image();
+    const url = URL.createObjectURL(new Blob([svgString], { type: 'image/svg+xml' }));
+    const img = new Image();
     img.onload = () => {
       ctx.drawImage(img, 0, 0, size, size);
       URL.revokeObjectURL(url);
-      canvas.toBlob(pngBlob => {
-        canvas.remove();
-        resolve(pngBlob);
-      }, 'image/png');
+      canvas.toBlob(pngBlob => resolve(pngBlob), 'image/png');
     };
     img.onerror = reject;
     img.src = url;
   });
 }
 
-function getPngScale() {
-  return parseInt(document.getElementById('select-scale').value, 10);
-}
-
-// ═══════════════════════════════════════════════════════
-// JSZip loader
-// ═══════════════════════════════════════════════════════
 function loadJSZip() {
   return new Promise((resolve, reject) => {
     if (window.JSZip) { resolve(window.JSZip); return; }
@@ -1082,206 +815,66 @@ function loadJSZip() {
   });
 }
 
-// ═══════════════════════════════════════════════════════
-// BLANK GRID DOWNLOAD
-// ═══════════════════════════════════════════════════════
 async function downloadBlankGrid() {
-  setStatus('Preparing blank grid…');
-  const JSZip = await loadJSZip();
-  const scale = getPngScale();
-  const zip   = new JSZip();
-
-  const f      = FONTS[fontIndex];
-  const srcUri = await fetchFontB64(f);
-  const styleBlock = `<defs><style>
-    @font-face { font-family: '${f.name}'; src: url('${srcUri}') format('truetype'); }
-  </style></defs>`;
-  const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
+  try {
+    const JSZip = await loadJSZip();
+    const zip = new JSZip();
+    const svgStr = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 540" width="540" height="540">
-${styleBlock}
 ${gridMarkup()}
 </svg>`;
-
-  zip.file('blank_grid.svg', svgStr);
-  setStatus('Rendering PNG…');
-  zip.file('blank_grid.png', await svgToPng(svgStr, scale));
-
-  const blob = await zip.generateAsync({ type: 'blob' });
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(blob),
-    download: 'blank_grid.zip',
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
-  setStatus('Blank grid downloaded ✓', 'ok');
-}
-
-// ═══════════════════════════════════════════════════════
-// SINGLE-PUZZLE DOWNLOAD
-// ═══════════════════════════════════════════════════════
-async function downloadSingle() {
-  if (!state.puzzle) return;
-  setStatus('Preparing download…');
-  const JSZip = await loadJSZip();
-  const scale = getPngScale();
-  const zip   = new JSZip();
-
-  const puzzleSvg   = await buildStandaloneSVG(state.puzzle, null,           false);
-  const solutionSvg = await buildStandaloneSVG(state.puzzle, state.solution, true);
-
-  zip.file('sudoku_puzzle.svg',    puzzleSvg);
-  zip.file('sudoku_solution.svg',  solutionSvg);
-
-  setStatus('Rendering PNGs…');
-  zip.file('sudoku_puzzle.png',    await svgToPng(puzzleSvg,   scale));
-  zip.file('sudoku_solution.png',  await svgToPng(solutionSvg, scale));
-
-  const blob = await zip.generateAsync({ type:'blob' });
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(blob),
-    download: `sudoku_${diffName(state.difficulty)}.zip`,
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
-  const clues = state.puzzle.flat().filter(v => v!==0).length;
-  setStatus(`Downloaded — ${diffName(state.difficulty)} — ${clues} clues ✓`, 'ok');
-}
-
-// ═══════════════════════════════════════════════════════
-// FULL BOOK BATCH GENERATOR
-// ═══════════════════════════════════════════════════════
-function pad(n, len=2) { return String(n).padStart(len,'0'); }
-function yieldToBrowser() { return new Promise(r => setTimeout(r, 0)); }
-
-async function generateBook() {
-  const plan  = getBookPlan();
-  const total = plan.reduce((s, d) => s + d.count, 0);
-  if (total === 0) { setStatus('Set at least one puzzle count first.', 'fail'); return; }
-
-  // Validate all active difficulty ranges before starting
-  if (!validateRanges(plan.map(p => p.difficulty))) {
-    setStatus('Fix the highlighted clue ranges before generating.', 'fail');
-    return;
+    zip.file('blank_grid.svg', svgStr);
+    zip.file('blank_grid.png', await svgToPng(svgStr, 3));   // 1620px (~300 DPI print)
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'blank_grid.zip' });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) {
+    setStatus('Could not prepare the blank grid: ' + e.message, 'fail');
   }
-
-  const JSZip    = await loadJSZip();
-  const btnBatch = document.getElementById('btn-batch');
-  const btnDl    = document.getElementById('btn-download');
-  const track    = document.getElementById('batch-bar-track');
-  const fill     = document.getElementById('batch-bar-fill');
-  const detail   = document.getElementById('batch-detail');
-
-  btnBatch.disabled = true;
-  btnDl.disabled    = true;
-  track.style.display = 'block';
-  fill.style.width    = '0%';
-
-  const zip   = new JSZip();
-  const scale = getPngScale();
-  let   done  = 0;
-
-  for (const { difficulty, count } of plan) {
-    const folder    = zip.folder(diffName(difficulty));
-    const folderSol = zip.folder(diffName(difficulty) + '/solutions');
-
-    for (let i = 1; i <= count; i++) {
-      detail.textContent = `${diffName(difficulty)} ${i}/${count}  —  ${done+1} of ${total} total`;
-
-      const result = generatePuzzleInRange(difficulty);
-      if (!result) { i--; continue; } // couldn't hit range — retry puzzle
-      const { puzzle, solution } = result;
-      if (!solve(puzzle)) { i--; continue; } // solver sanity check
-
-      const num        = pad(i);
-      const puzzleSvg  = await buildStandaloneSVG(puzzle, null,     false);
-      const solutionSvg = await buildStandaloneSVG(puzzle, solution, true);
-
-      folder.file(   `puzzle_${num}.svg`,    puzzleSvg);
-      folderSol.file(`solution_${num}.svg`,  solutionSvg);
-      folder.file(   `puzzle_${num}.png`,    await svgToPng(puzzleSvg,   scale));
-      folderSol.file(`solution_${num}.png`,  await svgToPng(solutionSvg, scale));
-
-      done++;
-      fill.style.width = ((done / total) * 100).toFixed(1) + '%';
-
-      renderToSVGElement(document.getElementById('svg-puzzle'),   puzzle, solution, false);
-      renderToSVGElement(document.getElementById('svg-solution'), puzzle, solution, true);
-      setStatus(`Generating… ${diffName(difficulty)} ${i}/${count} — ${puzzle.flat().filter(v=>v!==0).length} clues`);
-
-      await yieldToBrowser();
-    }
-  }
-
-  detail.textContent = `Zipping ${total*4} files…`;
-  setStatus('Zipping…');
-  await yieldToBrowser();
-
-  const blob = await zip.generateAsync(
-    { type:'blob', compression:'DEFLATE', compressionOptions:{ level:6 } },
-    meta => { fill.style.width = meta.percent.toFixed(1) + '%'; }
-  );
-
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(blob),
-    download: 'sudoku_book.zip',
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
-
-  fill.style.width = '100%';
-  detail.textContent = `✓ ${total} puzzles · ${total*4} files (SVG + PNG) downloaded`;
-  setStatus(`Full book generated — ${total} puzzles, solver verified ✓`, 'ok');
-  btnBatch.disabled = false;
-  btnDl.disabled = state.puzzle ? false : true;
 }
+$('btn-blank').addEventListener('click', downloadBlankGrid);
 
 // ═══════════════════════════════════════════════════════
 // CLUE RANGE UI + VALIDATION
 // ═══════════════════════════════════════════════════════
-
 // Called live on input — just update CLUE_RANGES and clear any error state.
 // No auto-clamping: let the user type freely; we validate before generating.
 function updateClueRange(difficulty) {
-  const min = parseInt(document.getElementById(`cr-${difficulty}-min`).value, 10);
-  const max = parseInt(document.getElementById(`cr-${difficulty}-max`).value, 10);
+  const min = parseInt($(`cr-${difficulty}-min`).value, 10);
+  const max = parseInt($(`cr-${difficulty}-max`).value, 10);
   if (!isNaN(min) && !isNaN(max)) CLUE_RANGES[difficulty] = [min, max];
-  clearRangeError(difficulty);
-}
-
-function clearRangeError(difficulty) {
-  document.getElementById(`cr-${difficulty}-min`).classList.remove('error');
-  document.getElementById(`cr-${difficulty}-max`).classList.remove('error');
+  $(`cr-${difficulty}-min`).classList.remove('error');
+  $(`cr-${difficulty}-max`).classList.remove('error');
 }
 
 // Returns true if valid, false + marks red if not.
 function validateRange(difficulty) {
-  const minEl = document.getElementById(`cr-${difficulty}-min`);
-  const maxEl = document.getElementById(`cr-${difficulty}-max`);
-  const min   = parseInt(minEl.value, 10);
-  const max   = parseInt(maxEl.value, 10);
-  const ok    = !isNaN(min) && !isNaN(max) && min >= 17 && max <= 80 && min <= max;
+  const minEl = $(`cr-${difficulty}-min`), maxEl = $(`cr-${difficulty}-max`);
+  const min = parseInt(minEl.value, 10), max = parseInt(maxEl.value, 10);
+  const ok = !isNaN(min) && !isNaN(max) && min >= 17 && max <= 80 && min <= max;
   minEl.classList.toggle('error', !ok);
   maxEl.classList.toggle('error', !ok);
   return ok;
 }
 
-// Validate only the difficulties that will actually be used.
-function validateRanges(difficulties) {
-  let allOk = true;
-  for (const d of difficulties) if (!validateRange(d)) allOk = false;
-  return allOk;
+// Only the selected difficulty's clue range is shown.
+function showClueRow() {
+  const d = $('difficulty').value;
+  document.querySelectorAll('.clue-row').forEach(row => { row.hidden = row.dataset.diff !== d; });
 }
+$('difficulty').addEventListener('change', showClueRow);
 
-// ── Persistence: remember the Book Composition panel (counts, clue ranges, PNG resolution) ──
+// ── Persistence: remember the difficulty + clue ranges ──
+const DIFFS = ['easy', 'medium', 'hard', 'extreme', 'surreal'];
 const COMPOSITION_KEY = 'sudoku_book_composition_v1';
-const COMPOSITION_IDS = ['easy','medium','hard','extreme','surreal']
-  .flatMap(d => [`inp-${d}`, `cr-${d}-min`, `cr-${d}-max`]).concat('select-scale');
+const COMPOSITION_IDS = DIFFS.flatMap(d => [`cr-${d}-min`, `cr-${d}-max`]).concat('difficulty');
 
 function saveComposition() {
   try {
-    const vals = Object.fromEntries(COMPOSITION_IDS.map(id => [id, document.getElementById(id).value]));
+    const vals = Object.fromEntries(COMPOSITION_IDS.map(id => [id, $(id).value]));
     localStorage.setItem(COMPOSITION_KEY, JSON.stringify(vals));
-  } catch (e) { /* storage unavailable (e.g. private mode) — panel still works, just won't remember */ }
+  } catch (e) { /* storage unavailable (e.g. private mode) — still works, just won't remember */ }
 }
 
 function loadComposition() {
@@ -1289,41 +882,39 @@ function loadComposition() {
     const vals = JSON.parse(localStorage.getItem(COMPOSITION_KEY) || 'null');
     if (!vals) return;
     for (const id of COMPOSITION_IDS) {
-      const el = document.getElementById(id);
+      const el = $(id);
       if (vals[id] == null) continue;
       if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === vals[id])) continue; // never leave the select empty
       el.value = vals[id];
     }
-    // CLUE_RANGES is separate state that generate() reads — resync it from the restored inputs.
-    ['easy','medium','hard','extreme','surreal'].forEach(updateClueRange);
+    DIFFS.forEach(updateClueRange);   // CLUE_RANGES is what generate() reads — resync it
   } catch (e) { /* corrupt or unavailable — keep the defaults */ }
 }
 
 // Reset = defaults straight from the markup (input defaultValue / the option marked `selected`).
 function resetComposition() {
-  if (!confirm('Reset Book Composition to the defaults? Your counts, clue ranges and PNG resolution will be replaced.')) return;
+  if (!confirm('Reset the difficulty and clue ranges to the defaults?')) return;
   for (const id of COMPOSITION_IDS) {
-    const el = document.getElementById(id);
+    const el = $(id);
     el.value = el.tagName === 'SELECT'
       ? ([...el.options].find(o => o.defaultSelected) || el.options[0]).value
       : el.defaultValue;
   }
-  ['easy','medium','hard','extreme','surreal'].forEach(updateClueRange); // resync CLUE_RANGES (what generate() reads)
-  updateTotal();
-  saveComposition();   // overwrite the stored panel
+  DIFFS.forEach(updateClueRange);
+  showClueRow();
+  saveComposition();
 }
 
-const bookPanel = document.getElementById('book-panel');
-bookPanel.addEventListener('input',  saveComposition);
-bookPanel.addEventListener('change', saveComposition);
-document.getElementById('btn-comp-reset').addEventListener('click', resetComposition);
+const setupPanel = $('setup-panel');
+setupPanel.addEventListener('input', saveComposition);
+setupPanel.addEventListener('change', saveComposition);
+$('btn-comp-reset').addEventListener('click', resetComposition);
 
 // ── Init ──
-loadCustomFonts();
-prefetchFonts();
-loadPicks();          // after loadCustomFonts, so a saved custom font can be found
 loadComposition();
-updateTotal();
+showClueRow();
+renderBoard();
+generate();   // a puzzle is ready to play as soon as the page opens
 </script>
 </body>
 </html>
