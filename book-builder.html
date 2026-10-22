@@ -650,6 +650,32 @@ const INK_RED   = cmyk(0, 0.9, 0.85, 0.05);  // solution red (CMYK)
 // Draw a sudoku natively into a box as CMYK vector (pure-K grid + numbers).
 // No raster, no RGB — so it drops cleanly into a CMYK/PDF-X workflow and stays
 // crisp at any size. `outline` = 'bold' | 'thin'.
+// Text is drawn as vector outlines, never as an embedded font: KDP fails to
+// process interiors that contain pdf-lib-embedded TrueType fonts (verified by
+// bisection). Width maths matches pdf-lib's (sum of glyph advance widths).
+function outlineFont(bytes){
+  const fk = window.fontkit.create(new Uint8Array(bytes)), upm = fk.unitsPerEm;
+  return { fk, upm, widthOfTextAtSize(t, size){ return fk.layout(t).glyphs.reduce((w,g) => w + g.advanceWidth, 0) * size / upm; } };
+}
+function drawOutlined(pg, text, { x, y, size, font, color, rotate }){
+  let d = '', adv = 0;
+  for (const g of font.fk.layout(text).glyphs){
+    for (const c of g.path.commands){
+      const a = c.args, pt = i => `${(a[i]+adv).toFixed(2)} ${(-a[i+1]).toFixed(2)}`;   // fontkit is y-up, SVG y-down
+      if (c.command === 'moveTo') d += `M${pt(0)}`;
+      else if (c.command === 'lineTo') d += `L${pt(0)}`;
+      else if (c.command === 'quadraticCurveTo') d += `Q${pt(0)} ${pt(2)}`;
+      else if (c.command === 'bezierCurveTo') d += `C${pt(0)} ${pt(2)} ${pt(4)}`;
+      else if (c.command === 'closePath') d += 'Z';
+    }
+    adv += g.advanceWidth;
+  }
+  if (!d) return;
+  const opts = { x, y, scale:size / font.upm, color };
+  if (rotate) opts.rotate = rotate;
+  pg.drawSvgPath(d, opts);
+}
+
 function drawSudoku(pg, rect, puzzle, solution, showSolution, font, outline){
   const { x, y, w, h } = rect;
   const sX = w/540, sY = h/540, th = (sX+sY)/2;
@@ -672,7 +698,7 @@ function drawSudoku(pg, rect, puzzle, solution, showSolution, font, outline){
     else if (showSolution && solution){ ch=String(solution[r][c]); col=INK_RED; }
     if (!ch) continue;
     const cx=px(30+c*60), cy=py(30+r*60), tw=font.widthOfTextAtSize(ch, fs);
-    pg.drawText(ch, { x:cx-tw/2, y:cy-vc, size:fs, font, color:col });
+    drawOutlined(pg, ch, { x:cx-tw/2, y:cy-vc, size:fs, font, color:col });
   }
 }
 
@@ -870,7 +896,7 @@ function fixHeadings(pages, plan, font, color, numberMode, doFillPuz, doFillAns)
       const ob = textBBox(h), nb = textBBox({ x, y:h.y, w:newW, fs:size, angle:0 }), pad = 1.4;
       const minx = Math.min(ob.x, nb.x), maxx = Math.max(ob.x+ob.w, nb.x+nb.w), miny = Math.min(ob.y, nb.y), maxy = Math.max(ob.y+ob.h, nb.y+nb.h);
       pages[page-1].drawRectangle({ x:minx-size*0.2, y:miny-pad, width:(maxx-minx)+size*0.4, height:(maxy-miny)+2*pad, color:INK_PAPER });
-      pages[page-1].drawText(text, { x, y:h.y, size, font, color });
+      drawOutlined(pages[page-1], text, { x, y:h.y, size, font, color });
     }
   }
 }
@@ -893,7 +919,7 @@ function drawLabelGroup(pg, items, text, font, color=INK_K, box){
   const p = labelPlacement(items, text, font, box);
   const opts = { x:p.x, y:p.y, size:p.size, font, color };
   if (Math.abs(p.deg) >= 1) opts.rotate = PDFLib.degrees(p.deg);
-  pg.drawText(text, opts);
+  drawOutlined(pg, text, opts);
 }
 
 function stampPageNumbers(pages, font, color=INK_K, numberMode='auto'){
@@ -918,7 +944,7 @@ function stampPageNumbers(pages, font, color=INK_K, numberMode='auto'){
     // number (e.g. "100" over "9") never overhangs its white box.
     const coverW = Math.max(it.w, tw), asc=size*0.82, desc=size*0.30, pad=1.3;
     pages[p-1].drawRectangle({ x:cx-coverW/2-pad, y:it.y-desc-pad, width:coverW+2*pad, height:asc+desc+2*pad, color:INK_PAPER });
-    pages[p-1].drawText(num, { x:cx-tw/2, y:it.y, size, font, color });
+    drawOutlined(pages[p-1], num, { x:cx-tw/2, y:it.y, size, font, color });
   }
 }
 
@@ -970,16 +996,15 @@ async function buildBook(){
   const fPage   = FONTS[parseInt($('font-page').value,10)]   || FONTS[0];
   await Promise.all([ensureFont(fSudoku), ensureFont(fLabel), ensureFont(fPage)]);
 
-  // 3) open with pdf-lib, embed the sudoku-number + label + page-number fonts
+  // 3) open with pdf-lib, load the sudoku-number + label + page-number fonts (drawn as outlines)
   setStatus('Stamping pages…'); $('detail').textContent='';
   const outline = $('grid-outline').value;
   // updateMetadata:false keeps the Info dict (Producer/ModDate) identical to the XMP packet;
   // manuscripts declare PDF/X-4 and a mismatch there makes print preflight (KDP) reject the file
   const pdfDoc = await PDFLib.PDFDocument.load(masterBytes.slice(), { updateMetadata:false });
-  pdfDoc.registerFontkit(window.fontkit);
-  const sudokuFont = await pdfDoc.embedFont(fSudoku.bytes);
-  const labelFont  = (fLabel===fSudoku) ? sudokuFont : await pdfDoc.embedFont(fLabel.bytes);
-  const pageFont   = (fPage===fSudoku)  ? sudokuFont : (fPage===fLabel ? labelFont : await pdfDoc.embedFont(fPage.bytes));
+  const sudokuFont = outlineFont(fSudoku.bytes);
+  const labelFont  = (fLabel===fSudoku) ? sudokuFont : outlineFont(fLabel.bytes);
+  const pageFont   = (fPage===fSudoku)  ? sudokuFont : (fPage===fLabel ? labelFont : outlineFont(fPage.bytes));
   const pages = pdfDoc.getPages();
 
   // 3) place puzzles
