@@ -771,7 +771,10 @@ function coverLabel(pg, items, text, font, box){
   let minx=Infinity, miny=Infinity, maxx=-Infinity, maxy=-Infinity;
   for (const b of boxes){ minx=Math.min(minx,b.x); miny=Math.min(miny,b.y); maxx=Math.max(maxx,b.x+b.w); maxy=Math.max(maxy,b.y+b.h); }
   const pad=1.4;
-  pg.drawRectangle({ x:minx-pad, y:miny-pad, width:(maxx-minx)+2*pad, height:(maxy-miny)+2*pad, color:INK_PAPER });
+  // Bare numbers sit in the open margin; italic fonts (e.g. Lobo Tommy's "2") lean up to
+  // ~0.1 em past their advance width, so a 1.4pt pad left a sliver of the old digit showing.
+  const padX = items.kind === 'number' ? Math.max(pad, items[0].fs*0.2) : pad;
+  pg.drawRectangle({ x:minx-padX, y:miny-pad, width:(maxx-minx)+2*padX, height:(maxy-miny)+2*pad, color:INK_PAPER });
 }
 
 // Find the box's label = the difficulty-word text nearest the box, preferring
