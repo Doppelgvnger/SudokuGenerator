@@ -973,7 +973,9 @@ async function buildBook(){
   // 3) open with pdf-lib, embed the sudoku-number + label + page-number fonts
   setStatus('Stamping pages…'); $('detail').textContent='';
   const outline = $('grid-outline').value;
-  const pdfDoc = await PDFLib.PDFDocument.load(masterBytes.slice());
+  // updateMetadata:false keeps the Info dict (Producer/ModDate) identical to the XMP packet;
+  // manuscripts declare PDF/X-4 and a mismatch there makes print preflight (KDP) reject the file
+  const pdfDoc = await PDFLib.PDFDocument.load(masterBytes.slice(), { updateMetadata:false });
   pdfDoc.registerFontkit(window.fontkit);
   const sudokuFont = await pdfDoc.embedFont(fSudoku.bytes);
   const labelFont  = (fLabel===fSudoku) ? sudokuFont : await pdfDoc.embedFont(fLabel.bytes);
