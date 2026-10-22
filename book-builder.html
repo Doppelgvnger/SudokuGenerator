@@ -197,6 +197,16 @@
       </div>
     </div>
     <div class="field">
+      <label for="labelnum">Puzzle numbering</label>
+      <div class="row">
+        <select id="labelnum" title="Auto: a bare number beside a box is renumbered on its own; otherwise the 'Easy 1' style label is used">
+          <option value="auto" selected>Auto-detect</option>
+          <option value="word">Word + number (Easy 1)</option>
+          <option value="number">Number only (1, 2, 3…)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
       <label for="label-transparency">Label transparency <span id="label-transp-val" style="color:#7a8a6a">0%</span></label>
       <div class="row"><input type="range" id="label-transparency" min="0" max="100" value="0" step="5" style="flex:1"
         oninput="document.getElementById('label-transp-val').textContent=this.value+'%'"></div>
@@ -311,6 +321,7 @@ const FONTS = [
   { name:'Vincendo', src:'Fonts/vincendo/Vincendo-Regular.ttf' },
   { name:'Inter',    src:'Fonts/inter/Inter_24pt-Medium.ttf' },
   { name:'Aileron',  src:'Fonts/aileron/Aileron-SemiBold.otf' },
+  { name:'Lobo Tommy', src:'Fonts/lobo-tommy/LoboTommy-ExpItalic.ttf' },
 ];
 const BUILTIN_FONT_COUNT = FONTS.length;
 const CUSTOM_FONTS_KEY = 'bookbuilder_custom_fonts';
@@ -720,6 +731,15 @@ function labelPlacement(items, text, font, box){
   const deg   = Math.round(angle*180/Math.PI);
   const newW  = font.widthOfTextAtSize(text, size);
   let x, y;
+  if (items.kind === 'number' && box){
+    // Bare puzzle number beside the box: keep the old spot and grow AWAY from the
+    // box (right-aligned on its left side, left-aligned on its right side).
+    const it = items[0];
+    const leftOfBox = it.x + it.w/2 < box.x + box.w/2;
+    x = leftOfBox ? it.x + it.w - newW : it.x;
+    y = it.y;
+    return { x, y, size, angle, deg, newW };
+  }
   if (Math.abs(deg) < 1){ // horizontal
     const minX=Math.min(...items.map(it=>it.x)), maxX=Math.max(...items.map(it=>it.x+it.w));
     const oldC = (minX+maxX)/2;
@@ -777,6 +797,46 @@ function findLabelGroup(pageData, boxRef, allRects){
   return cands.filter(it=>it.fs >= maxFs-2); // the prominent label (+ its split runs)
 }
 
+// Bare puzzle number (e.g. "1", "2" beside the boxes, with the difficulty word as a
+// separate page heading). It must sit level with the box and just outside its left
+// or right wall, so a page number above/below the content is never mistaken for it,
+// and it must not be the tail of a split word label like "Easy" + "1".
+function findNumberLabel(pageData, boxRef, allRects){
+  const { x:bx, y:by, w:bw, h:bh } = boxRef.rect, GAP = 40;
+  const owns = (c) => {
+    let best=Infinity, br=null;
+    for (const r of allRects){ const dx=c.x-(r.x+r.w/2), dy=c.y-(r.y+r.h/2), d=dx*dx+dy*dy; if(d<best){best=d;br=r;} }
+    return br && Math.abs(br.x-bx)<0.5 && Math.abs(br.y-by)<0.5;
+  };
+  let best=null, bestGap=Infinity;
+  for (const it of pageData.items){
+    if (!/^\d{1,3}$/.test(it.str.trim()) || Math.abs(it.angle) > 0.02) continue;
+    const b = textBBox(it), cy = b.y + b.h/2;
+    if (cy < by || cy > by + bh) continue;
+    const leftGap = bx - (b.x + b.w), rightGap = b.x - (bx + bw);
+    const gap = (leftGap >= -1 && leftGap <= GAP) ? leftGap : (rightGap >= -1 && rightGap <= GAP) ? rightGap : null;
+    if (gap === null || !owns(labelCenter(it))) continue;
+    const partOfWord = pageData.items.some(o => o !== it && looksLikeLabel(o.str) &&
+      Math.abs(o.y - it.y) < it.fs*0.5 && Math.min(Math.abs(o.x + o.w - it.x), Math.abs(it.x + it.w - o.x)) < it.fs*1.5);
+    if (partOfWord) continue;
+    if (gap < bestGap){ best = it; bestGap = gap; }
+  }
+  if (!best) return null;
+  const group = [best];
+  group.kind = 'number';
+  return group;
+}
+
+// The label to replace for a box, per the "Puzzle numbering" setting.
+function findBoxLabel(pageData, boxRef, allRects, mode){
+  if (mode !== 'word'){
+    const n = findNumberLabel(pageData, boxRef, allRects);
+    if (n || mode === 'number') return n;
+  }
+  return findLabelGroup(pageData, boxRef, allRects);
+}
+const labelText = (lbl, d, n, caseMode) => lbl.kind === 'number' ? String(n) : `${capCase(palName(d), caseMode)} ${n}`;
+
 // Draw `text` in place of the old label group, preserving size, orientation and
 // centre. NOTE: covering the old text is done separately, BEFORE the sudoku is
 // drawn, so the sudoku stays the top layer (no white cover bleeding onto the
@@ -788,12 +848,16 @@ function drawLabelGroup(pg, items, text, font, color=INK_K, box){
   pg.drawText(text, opts);
 }
 
-function stampPageNumbers(pages, font, color=INK_K){
+function stampPageNumbers(pages, font, color=INK_K, numberMode='auto'){
   const startPage = parseInt($('startPage').value,10) || 1;
   const startVal  = parseInt($('startVal').value,10);
   for (let p=startPage; p<=pages.length; p++){
     const pageData = analysis.pages[p-1];
-    const cand = pageData.items.filter(it=>/^\d+$/.test(it.str.trim()) && it.fs>=15);
+    // bare puzzle numbers beside the boxes are labels, never page numbers
+    const allRects = pageData.boxes.map(b=>b.rect);
+    const puzzleNums = new Set(numberMode === 'word' ? [] :
+      pageData.boxes.flatMap(b => findNumberLabel(pageData, b, allRects) || []));
+    const cand = pageData.items.filter(it=>/^\d+$/.test(it.str.trim()) && it.fs>=15 && !puzzleNums.has(it));
     if (!cand.length) continue;            // dividers / unnumbered pages
     // pick the candidate closest to a vertical page edge (real page number)
     cand.sort((a,b)=> Math.min(a.y, pageData.Hpt-a.y) - Math.min(b.y, pageData.Hpt-b.y));
@@ -816,6 +880,7 @@ function stampPageNumbers(pages, font, color=INK_K){
 async function buildBook(){
   const plan = buildPlan();
   const labelMode = $('labelcase').value;
+  const numberMode = $('labelnum').value;   // auto / word / number
   // Label & page-number transparency → lighter CMYK K tint (0% = solid black,
   // 100% = no ink). Stays pure-CMYK (no alpha), so the print file is unaffected.
   const labelColor   = cmyk(0, 0, 0, 1 - (parseInt($('label-transparency').value,10)||0)/100);
@@ -883,8 +948,8 @@ async function buildBook(){
         const allRects = pageData.boxes.map(b=>b.rect);
         // cover the old label (sized to fit the NEW text too) BEFORE the sudoku,
         // so the sudoku stays the top layer over any overlap
-        const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
-        const newText = lbl ? `${capCase(palName(d),labelMode)} ${i+1}` : null;
+        const lbl = doRelabel ? findBoxLabel(pageData, box, allRects, numberMode) : null;
+        const newText = lbl ? labelText(lbl, d, i+1, labelMode) : null;
         if (lbl) coverLabel(pg, lbl, newText, labelFont, box.rect);
         drawSudoku(pg, box.rect, res.puzzle, null, false, sudokuFont, outline);
         if (lbl) drawLabelGroup(pg, lbl, newText, labelFont, labelColor, box.rect);
@@ -905,8 +970,8 @@ async function buildBook(){
       const pg  = pages[box.page-1];
       const pageData = analysis.pages[box.page-1];
       const allRects = pageData.boxes.map(b=>b.rect);
-      const lbl = doRelabel ? findLabelGroup(pageData, box, allRects) : null;
-      const newText = lbl ? `${capCase(palName(d),labelMode)} ${idx}` : null;
+      const lbl = doRelabel ? findBoxLabel(pageData, box, allRects, numberMode) : null;
+      const newText = lbl ? labelText(lbl, d, idx, labelMode) : null;
       if (lbl) coverLabel(pg, lbl, newText, labelFont, box.rect);
       drawSudoku(pg, box.rect, res.puzzle, res.solution, true, sudokuFont, outline);
       if (lbl) drawLabelGroup(pg, lbl, newText, labelFont, labelColor, box.rect);
@@ -916,7 +981,7 @@ async function buildBook(){
   }
 
   // 5) page numbers
-  if (doRenumber){ setStatus('Renumbering pages…'); stampPageNumbers(pages, pageFont, pageNumColor); }
+  if (doRenumber){ setStatus('Renumbering pages…'); stampPageNumbers(pages, pageFont, pageNumColor, numberMode); }
 
   // 6) save + download. Keep the blob so the user can re-download if the
   //    browser's initial download prompt was dismissed/blocked.
